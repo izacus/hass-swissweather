@@ -1,0 +1,16 @@
+{
+  "domain": "swissweather",
+  "name": "Swiss Weather",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/swissweather",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "codeowners": [
+    "@izacus"
+  ],
+  "iot_class": "cloud_polling"
+}
