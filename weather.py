@@ -34,13 +34,11 @@ async def async_setup_entry(
     async_add_entities(
         [
             SwissWeather(
-                hass,
                 client,
                 config_entry.data,
                 False,
             ),
             SwissWeather(
-                hass,
                 client,
                 config_entry.data,
                 True,
@@ -169,6 +167,12 @@ class SwissWeather(WeatherEntity):
             if self._stationCode is not None:
                 self._current_state = await self.hass.async_add_executor_job(self._client.get_current_weather_for_station, 
                                                                               self._stationCode)
+        except Exception as e:
+            self._current_state = None
+            _LOGGER.error("Failed to load current state.")
+            _LOGGER.exception(e)
+
+        try:
             self._current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._postCode)
         except Exception as e:
             self._current_forecast = None
