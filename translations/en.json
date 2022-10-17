@@ -11,9 +11,8 @@
         "step": {
             "user": {
                 "data": {
-                    "host": "Host",
-                    "password": "Password",
-                    "username": "Username"
+                    "stationCode": "Code of the weather station",
+                    "postCode": "Post number of your location"
                 }
             }
         }

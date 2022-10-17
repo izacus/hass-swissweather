@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
+import datetime
 
-from types import MappingProxyType
 from typing import Any
-from config.custom_components.swissweather.meteo import MeteoClient, WeatherForecast, CurrentWeather
+from config.custom_components.swissweather import SwissWeatherDataCoordinator
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -15,8 +15,10 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_POST_CODE, CONF_STATION_CODE
+from .const import CONF_POST_CODE, DOMAIN
+from .meteo import WeatherForecast, CurrentWeather
 
 from homeassistant.components.weather import (
     Forecast,
@@ -30,39 +32,37 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    client = MeteoClient()
+    coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities(
         [
-            SwissWeather(
-                client,
-                config_entry.data,
-                False,
-            ),
-            SwissWeather(
-                client,
-                config_entry.data,
-                True,
-            ),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], False),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], True),
         ]
     )
 
-class SwissWeather(WeatherEntity):
-
-    _current_state : CurrentWeather = None
-    _current_forecast : WeatherForecast = None
+class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity):
 
     def __init__(
         self,
-        client: MeteoClient,
-        config: MappingProxyType[str, Any],
+        coordinator: SwissWeatherDataCoordinator,
+        postCode: str,
         hourly: bool,
     ) -> None:
-        super().__init__()
-        self._client = client
-        self._stationCode = config[CONF_STATION_CODE]
-        self._postCode = config[CONF_POST_CODE]
+        super().__init__(coordinator)
+        self._postCode = postCode
         self._hourly = hourly
-        self._current_forecast = None
+
+    @property
+    def _current_state(self) -> CurrentWeather:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data[0]
+
+    @property
+    def _current_forecast(self) -> WeatherForecast:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data[1]
 
     @property
     def unique_id(self) -> str | None:
@@ -138,7 +138,10 @@ class SwissWeather(WeatherEntity):
             return None
 
         if self._hourly:
-            forecast_data = self._current_forecast.hourlyForecast
+            now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+            _LOGGER.info(f"{now} vs. {self._current_forecast.hourlyForecast[0].timestamp}")
+            forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
+            _LOGGER.info(forecast_data)
         else:
             forecast_data = self._current_forecast.dailyForecast
         
@@ -161,20 +164,3 @@ class SwissWeather(WeatherEntity):
                 native_templow=meteo_forecast.temperatureMin[0],
                 native_wind_speed=wind_speed,
                 wind_bearing=wind_bearing)
-
-    async def async_update(self):
-        try:
-            if self._stationCode is not None:
-                self._current_state = await self.hass.async_add_executor_job(self._client.get_current_weather_for_station, 
-                                                                              self._stationCode)
-        except Exception as e:
-            self._current_state = None
-            _LOGGER.error("Failed to load current state.")
-            _LOGGER.exception(e)
-
-        try:
-            self._current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._postCode)
-        except Exception as e:
-            self._current_forecast = None
-            _LOGGER.error("Failed to load weather data.")
-            _LOGGER.exception(e)

@@ -138,7 +138,7 @@ class MeteoClient(object):
 
     def get_current_weather_for_station(self, station: str) -> Optional[CurrentWeather]:
         logger.debug("Retrieving current weather...")
-        data = _get_current_weather_line_for_station(station, self._get_ttl_hash())
+        data = self._get_current_weather_line_for_station(station)
         if data is None:
             logger.warning(f"Couldn't find data for station {station}")
             return None
@@ -195,8 +195,7 @@ class MeteoClient(object):
 
     ## Forecast
     def get_forecast(self, postCode) -> Optional[WeatherForecast]:
-        forecastJson = _get_forecast_json(postCode, self.language, self._get_ttl_hash())
-        logger.warn(f"Cache hit info: { _get_forecast_json.cache_info() }")
+        forecastJson = self._get_forecast_json(postCode, self.language)
         if forecastJson is None:
             return None
 
@@ -278,37 +277,29 @@ class MeteoClient(object):
                                       temperatureMean=tMean))
         return forecast
 
-    def _get_ttl_hash(self, seconds=600):
-        """Return the same value withing `seconds` time period"""
-        return round(time.time() / seconds)
+    def _get_current_weather_line_for_station(self, station):
+        return next((row for row in self._get_csv_dictionary_for_url(CURRENT_CONDITION_URL)
+            if row['Station/Location'] == station), None)
 
-# These are here for caching purposes.
-# We want to avoid hitting API too much.
-@functools.lru_cache(maxsize=4)
-def _get_current_weather_line_for_station(station, ttl_hash):
-    return next((row for row in _get_csv_dictionary_for_url(CURRENT_CONDITION_URL)
-        if row['Station/Location'] == station), None)
+    def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
+        try:
+            logger.info("Requesting station data...")
+            with requests.get(url, stream = True) as r:
+                lines = (line.decode(encoding) for line in r.iter_lines())
+                for row in csv.DictReader(lines, delimiter=';'):
+                    yield row
+        except requests.exceptions.RequestException as e:
+            logger.error("Connection failure.", exc_info=1)
+            return None
 
-def _get_csv_dictionary_for_url(url, encoding='utf-8'):
-    try:
-        logger.info("Requesting station data...")
-        with requests.get(url, stream = True) as r:
-            lines = (line.decode(encoding) for line in r.iter_lines())
-            for row in csv.DictReader(lines, delimiter=';'):
-                yield row
-    except requests.exceptions.RequestException as e:
-        logger.error("Connection failure.", exc_info=1)
-        return None
-
-@functools.lru_cache(maxsize=4)
-def _get_forecast_json(postCode, language, ttl_cache):
-    try:
-        url = FORECAST_URL.format(postCode)
-        logger.info("Requesting forecast data...")
-        return requests.get(url, headers = 
-            { "User-Agent": FORECAST_USER_AGENT, 
-                "Accept-Language": language, 
-                "Accept": "application/json" }).json()
-    except requests.exceptions.RequestException as e:
-        logger.error("Connection failure.", exc_info=1)
-        return None
+    def _get_forecast_json(self, postCode, language):
+        try:
+            url = FORECAST_URL.format(postCode)
+            logger.info("Requesting forecast data...")
+            return requests.get(url, headers = 
+                { "User-Agent": FORECAST_USER_AGENT, 
+                    "Accept-Language": language, 
+                    "Accept": "application/json" }).json()
+        except requests.exceptions.RequestException as e:
+            logger.error("Connection failure.", exc_info=1)
+            return None
