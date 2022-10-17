@@ -6,7 +6,6 @@ import logging
 
 from datetime import timedelta
 from random import randrange
-from config.custom_components.swissweather.meteo import WeatherForecast, CurrentState
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -14,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, CONF_POST_CODE, CONF_STATION_CODE
-from .meteo import MeteoClient
+from .meteo import MeteoClient, WeatherForecast, CurrentState
 
 _LOGGER = logging.getLogger(__name__)
 
