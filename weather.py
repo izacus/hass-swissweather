@@ -4,7 +4,6 @@ import logging
 import datetime
 
 from typing import Any
-from config.custom_components.swissweather import SwissWeatherDataCoordinator
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -17,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import SwissWeatherDataCoordinator
 from .const import CONF_POST_CODE, DOMAIN
 from .meteo import WeatherForecast, CurrentWeather
 
