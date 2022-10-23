@@ -17,7 +17,7 @@ from .meteo import MeteoClient, WeatherForecast, CurrentState
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.WEATHER]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.WEATHER]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Swiss Weather from a config entry."""
@@ -54,12 +54,14 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator["SwissWeatherCoordinator
         try:
             current_state = await self.hass.async_add_executor_job(
                 self._client.get_current_weather_for_station, self._station_code)
+            _LOGGER.debug(f"Current state: {current_state}")
         except Exception as e:
             _LOGGER.exception(e)
             current_state = None
 
         try:         
             current_forecast =  await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
+            _LOGGER.debug(f"Current state: {current_forecast}")
         except Exception as e:
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e

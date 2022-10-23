@@ -139,9 +139,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
 
         if self._hourly:
             now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-            _LOGGER.info(f"{now} vs. {self._current_forecast.hourlyForecast[0].timestamp}")
             forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
-            _LOGGER.info(forecast_data)
         else:
             forecast_data = self._current_forecast.dailyForecast
         
