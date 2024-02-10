@@ -1,13 +1,12 @@
 import csv
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import functools
-import requests
-import logging
 import itertools
-import time
-from datetime import datetime, timezone, timedelta
-from typing import Optional, NewType, List, Dict, Tuple
+import logging
+from typing import Dict, List, NewType, Optional, Tuple
 
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +172,7 @@ class MeteoClient(object):
         timestamp_raw = csv_row.get('Date', None)
         if timestamp_raw is not None:
             timestamp = datetime.strptime(timestamp_raw, '%Y%m%d%H%M').replace(tzinfo=timezone.utc)
-        
+
         station_data = CurrentWeather(
             csv_row.get('Station/Location'),
             timestamp,
@@ -202,7 +201,7 @@ class MeteoClient(object):
         currentState = self._get_current_state(forecastJson)
         dailyForecast = self._get_daily_forecast(forecastJson)
         hourlyForecast = self._get_hourly_forecast(forecastJson)
-        
+
         sunrises = None
         sunriseJson = forecastJson.get("graph", {}).get("sunrise", None)
         if sunriseJson is not None:
@@ -226,7 +225,7 @@ class MeteoClient(object):
         return CurrentState(
             (to_float(forecastJson.get('currentWeather', {}).get('temperature')), "°C"),
             currentIcon, currentCondition)        
-        
+
     def _get_daily_forecast(self, forecastJson) -> Optional[List[Forecast]]:
         forecast: List[Forecast] = []
         if "forecast" not in forecastJson:
@@ -252,14 +251,14 @@ class MeteoClient(object):
         startTimestampEpoch = to_int(graphJson.get('start', None))
         if startTimestampEpoch is None:
             return None
-        startTimestamp = datetime.fromtimestamp(startTimestampEpoch / 1000, timezone.utc)        
-        
+        startTimestamp = datetime.fromtimestamp(startTimestampEpoch / 1000, timezone.utc)
+
 
         forecast = []
         temperatureMaxList = [ (value, "°C") for value in graphJson.get("temperatureMax1h", [])]
         temperatureMeanList = [ (value, "°C") for value in graphJson.get("temperatureMean1h", [])]
         temperatureMinList = [ (value, "°C") for value in graphJson.get("temperatureMin1h", [])]
-        precipitationList = [ (value, "mm") for value in graphJson.get("precipitation1h", [])]        
+        precipitationList = [ (value, "mm") for value in graphJson.get("precipitation1h", [])]
 
         # We get icons only once every 3 hours so we need to expand each elemen 3-times to match
         iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in graphJson.get("weatherIcon3h", [])))
@@ -286,8 +285,7 @@ class MeteoClient(object):
             logger.info("Requesting station data...")
             with requests.get(url, stream = True) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
-                for row in csv.DictReader(lines, delimiter=';'):
-                    yield row
+                yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException as e:
             logger.error("Connection failure.", exc_info=1)
             return None

@@ -1,9 +1,9 @@
 {
   "domain": "swissweather",
   "name": "Swiss Weather",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/swissweather",
+  "documentation": "https://github.com/izacus/hass-swissweather",
   "requirements": [],
   "ssdp": [],
   "zeroconf": [],

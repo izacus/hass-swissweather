@@ -1,19 +1,18 @@
 """The Swiss Weather integration."""
 from __future__ import annotations
-from typing import Tuple
-
-import logging
 
 from datetime import timedelta
+import logging
 from random import randrange
+from typing import Tuple
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, CONF_POST_CODE, CONF_STATION_CODE
-from .meteo import MeteoClient, WeatherForecast, CurrentState
+from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .meteo import CurrentState, MeteoClient, WeatherForecast
 
 _LOGGER = logging.getLogger(__name__)
 

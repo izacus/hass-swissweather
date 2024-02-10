@@ -1,29 +1,27 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Callable
-
-import logging
 from decimal import Decimal
-
-from homeassistant.const import (
-    DEGREE,
-    LENGTH_MILLIMETERS,
-    PERCENTAGE,
-    PRESSURE_HPA,
-    IRRADIATION_WATTS_PER_SQUARE_METER,
-    SPEED_KILOMETERS_PER_HOUR,
-    TEMP_CELSIUS,
-    TIME_MINUTES,
-)
+import logging
+from typing import Callable
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorStateClass
+    SensorStateClass,
 )
-
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    DEGREE,
+    IRRADIATION_WATTS_PER_SQUARE_METER,
+    LENGTH_MILLIMETERS,
+    PERCENTAGE,
+    PRESSURE_HPA,
+    SPEED_KILOMETERS_PER_HOUR,
+    TEMP_CELSIUS,
+    TIME_MINUTES,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
@@ -31,7 +29,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import SwissWeatherDataCoordinator
-
 from .const import CONF_POST_CODE, DOMAIN
 from .meteo import CurrentWeather
 

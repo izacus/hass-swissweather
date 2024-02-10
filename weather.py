@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import logging
 import datetime
-
+import logging
 from typing import Any
 
+from homeassistant.components.weather import Forecast, WeatherEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     LENGTH_MILLIMETERS,
     PRESSURE_HPA,
+    SPEED_KILOMETERS_PER_HOUR,
     TEMP_CELSIUS,
-    SPEED_KILOMETERS_PER_HOUR
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,12 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SwissWeatherDataCoordinator
 from .const import CONF_POST_CODE, DOMAIN
-from .meteo import WeatherForecast, CurrentWeather
-
-from homeassistant.components.weather import (
-    Forecast,
-    WeatherEntity,
-)
+from .meteo import CurrentWeather, WeatherForecast
 
 _LOGGER = logging.getLogger(__name__)
 

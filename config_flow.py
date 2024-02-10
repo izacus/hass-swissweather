@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN, CONF_STATION_CODE, CONF_POST_CODE
+from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
