@@ -1,6 +1,6 @@
 import csv
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 import functools
 import itertools
 import logging
@@ -149,7 +149,7 @@ class MeteoClient(object):
         SKIP_NAMES = ['creation_time', 'map_short_name', 'license']
         all_station_data = self._get_csv_dictionary_for_url(STATION_URL.format(self.language), encoding='latin1')
         stations = {}
-        for row in all_station_data:            
+        for row in all_station_data:
             if row.get('Station', None) in SKIP_NAMES:
                 continue
             if temperatureOnly and "Temperature" not in row.get('Measurements', ""):
@@ -164,14 +164,14 @@ class MeteoClient(object):
                 to_float(row.get('Latitude', None)),
                 to_float(row.get('Longitude', None)),
                 row.get('Canton', None)
-            )      
+            )
         return stations
 
     def _get_current_data_for_row(self, csv_row) -> CurrentWeather:
         timestamp = None
         timestamp_raw = csv_row.get('Date', None)
         if timestamp_raw is not None:
-            timestamp = datetime.strptime(timestamp_raw, '%Y%m%d%H%M').replace(tzinfo=timezone.utc)
+            timestamp = datetime.strptime(timestamp_raw, '%Y%m%d%H%M').replace(tzinfo=UTC)
 
         station_data = CurrentWeather(
             csv_row.get('Station/Location'),

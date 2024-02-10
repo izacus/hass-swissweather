@@ -5,12 +5,13 @@ import logging
 from typing import Any
 
 from homeassistant.components.weather import Forecast, WeatherEntity
+from homeassistant.components.weather.const import WeatherEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    LENGTH_MILLIMETERS,
-    PRESSURE_HPA,
-    SPEED_KILOMETERS_PER_HOUR,
-    TEMP_CELSIUS,
+    UnitOfPrecipitationDepth,
+    UnitOfPressure,
+    UnitOfSpeed,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -30,8 +31,7 @@ async def async_setup_entry(
     coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities(
         [
-            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], False),
-            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], True),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE]),
         ]
     )
 
@@ -41,11 +41,9 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         self,
         coordinator: SwissWeatherDataCoordinator,
         postCode: str,
-        hourly: bool,
     ) -> None:
         super().__init__(coordinator)
         self._postCode = postCode
-        self._hourly = hourly
 
     @property
     def _current_state(self) -> CurrentWeather:
@@ -60,18 +58,12 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         return self.coordinator.data[1]
 
     @property
-    def unique_id(self) -> str | None:
-        if self._hourly:
-            return f"swiss_weather.{self._postCode}.hourly"
-        else:
-            return f"swiss_weather.{self._postCode}.daily"
+    def unique_id(self) -> str | None:        
+        return f"swiss_weather.{self._postCode}"
 
     @property
-    def name(self):
-        if self._hourly:
-            return f"Weather at {self._postCode} (Hourly)"
-        else:
-            return f"Weather at {self._postCode} (Daily)"
+    def name(self):        
+        return f"Weather at {self._postCode}"
 
     @property
     def condition(self) -> str | None:
@@ -89,11 +81,11 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
 
     @property
     def native_temperature_unit(self) -> str | None:
-        return TEMP_CELSIUS
+        return UnitOfTemperature.CELSIUS
 
     @property
     def native_precipitation_unit(self) -> str | None:
-        return LENGTH_MILLIMETERS
+        return UnitOfPrecipitationDepth.MILLIMETERS
 
     @property
     def native_wind_speed(self) -> float | None:
@@ -103,7 +95,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
 
     @property
     def native_wind_speed_unit(self) -> str | None:
-        return SPEED_KILOMETERS_PER_HOUR
+        return UnitOfSpeed.KILOMETERS_PER_HOUR
 
     @property
     def humidity(self) -> float | None:
@@ -125,32 +117,38 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
 
     @property
     def native_pressure_unit(self) -> str | None:
-        return PRESSURE_HPA
+        return UnitOfPressure.HPA
 
     @property
-    def forecast(self) -> list[Forecast] | None:
+    def supported_features(self) -> int | None:
+        return WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
+
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        _LOGGER.debug("Retrieving daily forecast.")
         if self._current_forecast is None:
             return None
+        forecast_data = self._current_forecast.dailyForecast
+        return [self.meteo_forecast_to_forecast(entry, False) for entry in forecast_data]
 
-        if self._hourly:
-            now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-            forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
-        else:
-            forecast_data = self._current_forecast.dailyForecast
-        
-        return list(map(lambda entry: self.meteo_forecast_to_forecast(entry), forecast_data))
+    async def async_forecast_hourly(self) -> list[Forecast] | None:
+        _LOGGER.debug("Retrieving hourly forecast.")
+        if self._current_forecast is None:
+            return None
+        now = datetime.datetime.now(tz=datetime.UTC)
+        forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
+        return [self.meteo_forecast_to_forecast(entry, True) for entry in forecast_data]
 
-    def meteo_forecast_to_forecast(self, meteo_forecast) -> Forecast:
-        if self._hourly:
+    def meteo_forecast_to_forecast(self, meteo_forecast, isHourly) -> Forecast:
+        if isHourly:
             temperature = meteo_forecast.temperatureMean[0]
             wind_speed = meteo_forecast.windSpeed[0]
             wind_bearing = meteo_forecast.windDirection[0]
-        else: 
+        else:
             temperature = meteo_forecast.temperatureMax[0]
             wind_speed = None
             wind_bearing = None
 
-        return Forecast(condition=meteo_forecast.condition, 
+        return Forecast(condition=meteo_forecast.condition,
                 datetime=meteo_forecast.timestamp,
                 native_precipitation=meteo_forecast.precipitation[0],
                 native_temperature=temperature,

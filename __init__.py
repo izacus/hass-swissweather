@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import datetime
 import logging
 from random import randrange
 from typing import Tuple
@@ -12,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import CurrentState, MeteoClient, WeatherForecast
+from .meteo import CurrentState, CurrentWeather, MeteoClient, WeatherForecast
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator["SwissWeatherCoordinator
     _client : MeteoClient = None
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        self._station_code = config_entry.data[CONF_STATION_CODE]
+        self._station_code = config_entry.data.get(CONF_STATION_CODE)
         self._post_code = config_entry.data[CONF_POST_CODE]
         self._client = MeteoClient()
         update_interval = timedelta(minutes=randrange(55, 65))
@@ -50,17 +51,24 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator["SwissWeatherCoordinator
 
     async def _async_update_data(self) -> Tuple[CurrentState, WeatherForecast]:
         _LOGGER.info("Updating weather data...")
-        try:
-            current_state = await self.hass.async_add_executor_job(
-                self._client.get_current_weather_for_station, self._station_code)
-            _LOGGER.debug(f"Current state: {current_state}")
-        except Exception as e:
-            _LOGGER.exception(e)
+        if self._station_code is None:
             current_state = None
+        else:
+            try:
+                current_state = await self.hass.async_add_executor_job(
+                    self._client.get_current_weather_for_station, self._station_code)
+                _LOGGER.debug(f"Current state: {current_state}")
+            except Exception as e:
+                _LOGGER.exception(e)
+                current_state = None
 
-        try:         
-            current_forecast =  await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
-            _LOGGER.debug(f"Current state: {current_forecast}")
+        try:
+            current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
+            _LOGGER.debug(f"Current forecast: {current_forecast}")
+            if current_state is None:
+                current = current_forecast.current
+                noValue = (None, None)
+                current_state = CurrentWeather(None, datetime.datetime.now(tz=datetime.UTC), current.currentTemperature, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue)
         except Exception as e:
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e
