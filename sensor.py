@@ -29,7 +29,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import SwissWeatherDataCoordinator
-from .const import CONF_POST_CODE, DOMAIN
+from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import CurrentWeather
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,17 +68,22 @@ async def async_setup_entry(
 ) -> None:
     coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     postCode: str = config_entry.data[CONF_POST_CODE]
-    entities: list[SwissWeatherSensor] = [SwissWeatherSensor(postCode, sensorEntry, coordinator) for sensorEntry in SENSORS]
+    stationCode: str = config_entry.data.get(CONF_STATION_CODE)
+    entities: list[SwissWeatherSensor] = [SwissWeatherSensor(postCode, stationCode, sensorEntry, coordinator) for sensorEntry in SENSORS]
     async_add_entities(entities)
 
 class SwissWeatherSensor(SensorEntity):
-    def __init__(self, post_code:str, sensor_entry:SwissWeatherSensorEntry, coordinator:SwissWeatherDataCoordinator) -> None:
+    def __init__(self, post_code:str, station_code:str, sensor_entry:SwissWeatherSensorEntry, coordinator:SwissWeatherDataCoordinator) -> None:
         self.entity_description = SensorEntityDescription(key=sensor_entry.key, name=sensor_entry.description, native_unit_of_measurement=sensor_entry.native_unit, device_class=sensor_entry.device_class, state_class=sensor_entry.state_class)
         self._coordinator = coordinator
-        self._sensor_entry = sensor_entry        
+        self._sensor_entry = sensor_entry
+        if station_code is None:
+            id_combo = f"{post_code}"
+        else:
+            id_combo = f"{post_code}-{station_code}"
         self._attr_name = f"{sensor_entry.description} at {post_code}"
         self._attr_unique_id = f"{post_code}.{sensor_entry.key}"
-        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, identifiers={(DOMAIN, f"swissweather-{post_code}")})
+        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
 
     @property
     def available(self) -> bool:
