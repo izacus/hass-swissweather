@@ -14,11 +14,13 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SwissWeatherDataCoordinator
-from .const import CONF_POST_CODE, DOMAIN
+from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import CurrentWeather, WeatherForecast
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ async def async_setup_entry(
     coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities(
         [
-            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE]),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], config_entry.data.get(CONF_STATION_CODE)),
         ]
     )
 
@@ -41,9 +43,15 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         self,
         coordinator: SwissWeatherDataCoordinator,
         postCode: str,
+        stationCode: str,
     ) -> None:
         super().__init__(coordinator)
+        if stationCode is None:
+            id_combo = f"{postCode}"
+        else:
+            id_combo = f"{postCode}-{stationCode}"
         self._postCode = postCode
+        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
 
     @property
     def _current_state(self) -> CurrentWeather:
