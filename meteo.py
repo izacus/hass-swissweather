@@ -277,8 +277,10 @@ class MeteoClient(object):
         return forecast
 
     def _get_current_weather_line_for_station(self, station):
+        if station is None:
+            return None
         return next((row for row in self._get_csv_dictionary_for_url(CURRENT_CONDITION_URL)
-            if row['Station/Location'] == station), None)
+            if row['Station/Location'].casefold() == station.casefold()), None)
 
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
