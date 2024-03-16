@@ -10,7 +10,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-STATION_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_{}.csv"
 CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/VQHA80.csv'
 
 FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz={}00"
@@ -143,29 +142,6 @@ class MeteoClient(object):
             return None
 
         return self._get_current_data_for_row(data)
-
-    @functools.lru_cache(maxsize=1)
-    def get_all_stations(self, temperatureOnly = False) -> Dict[str, StationInfo]:
-        SKIP_NAMES = ['creation_time', 'map_short_name', 'license']
-        all_station_data = self._get_csv_dictionary_for_url(STATION_URL.format(self.language), encoding='latin1')
-        stations = {}
-        for row in all_station_data:
-            if row.get('Station', None) in SKIP_NAMES:
-                continue
-            if temperatureOnly and "Temperature" not in row.get('Measurements', ""):
-                continue
-
-            abbr = row.get('Abbr.', None)
-            stations[abbr] = StationInfo(
-                row.get('Station', None),
-                abbr,
-                row.get('Station type', None),
-                to_float(row.get('Station height m a. sea level', None)),
-                to_float(row.get('Latitude', None)),
-                to_float(row.get('Longitude', None)),
-                row.get('Canton', None)
-            )
-        return stations
 
     def _get_current_data_for_row(self, csv_row) -> CurrentWeather:
         timestamp = None
