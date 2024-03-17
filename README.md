@@ -15,4 +15,4 @@ __Make sure directory name is `swissweather` or strings won't show up.__
 2. Add swissweather integration to Home Assistant. You'll be asked for two pieces of information:
 
 * Post Code: The post code of your location, used for forecast.
-* Station code: The station code of weather station showing life data near you. The list of stations can be found in following [CSV](https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv) - use the WIGOS-ID of nearest station to you within reason (e.g. use Zurich-Fluntern "SMA" for Zurich city, not Uetliberg).
+* Station code: The station code of weather station showing live data near you. Choose the closest station within reason - e.g. it probably doesn't make sense to select "Uetliberg" to get data in Zurich due to altitude difference. Choose Kloten on Fluntern instead.
