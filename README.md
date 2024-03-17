@@ -1,6 +1,10 @@
 # MeteoSwiss integration for HASS
 
-This is an integration to download data from MeteoSwiss and show current status, daily and hourly forecast in Home Assistant.
+This is an integration to download data from [MeteoSwiss](https://www.meteoschweiz.admin.ch/#tab=forecast-map).
+
+It currently supports:
+  * Current weather state - temperature, precipitation, humidity, wind, etc. for a given autmated measurement station.
+  * Hourly and daily weather forecast based on a location encoded with post number.
 
 ## Installation
 
@@ -31,5 +35,5 @@ __Make sure directory name is `swissweather` or strings won't show up.__
 
 1. Add Swiss Weather integration to Home Assistant. You'll be asked for two pieces of information:
 
-* Post Code: The post code of your location, used for forecast.
+* Post Code: The post code of your location, used for forecast - e.g. 8001 for Zurich.
 * Station code: The station code of weather station showing live data near you. Choose the closest station within reason - e.g. it probably doesn't make sense to select "Uetliberg" to get data in Zurich due to altitude difference. Choose Kloten on Fluntern instead.
