@@ -51,7 +51,10 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         else:
             id_combo = f"{postCode}-{stationCode}"
         self._postCode = postCode
-        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
+        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE,
+                                            name=f"MeteoSwiss at {id_combo}",
+                                            suggested_area=None,
+                                            identifiers={(DOMAIN, f"swissweather-{id_combo}")})
 
     @property
     def _current_state(self) -> CurrentWeather:
