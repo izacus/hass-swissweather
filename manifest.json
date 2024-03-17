@@ -4,6 +4,7 @@
   "version": "1.0.3",
   "config_flow": true,
   "documentation": "https://github.com/izacus/hass-swissweather",
+  "issue_tracker": "https://github.com/izacus/hass-swissweather/issues",
   "requirements": [],
   "ssdp": [],
   "zeroconf": [],
