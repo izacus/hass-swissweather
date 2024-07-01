@@ -160,7 +160,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
             wind_bearing = None
 
         return Forecast(condition=meteo_forecast.condition,
-                datetime=meteo_forecast.timestamp,
+                datetime=meteo_forecast.timestamp.isoformat(),
                 native_precipitation=meteo_forecast.precipitation[0],
                 native_temperature=temperature,
                 native_templow=meteo_forecast.temperatureMin[0],
