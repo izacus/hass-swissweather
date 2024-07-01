@@ -137,6 +137,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     async def async_forecast_daily(self) -> list[Forecast] | None:
         _LOGGER.debug("Retrieving daily forecast.")
         if self._current_forecast is None:
+            _LOGGER.info("No daily forecast available.")
             return None
         forecast_data = self._current_forecast.dailyForecast
         return [self.meteo_forecast_to_forecast(entry, False) for entry in forecast_data]
@@ -144,6 +145,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         _LOGGER.debug("Retrieving hourly forecast.")
         if self._current_forecast is None:
+            _LOGGER.info("No hourly forecast available.")
             return None
         now = datetime.datetime.now(tz=datetime.UTC)
         forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
