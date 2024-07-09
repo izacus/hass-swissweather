@@ -171,6 +171,7 @@ class MeteoClient(object):
     ## Forecast
     def get_forecast(self, postCode) -> Optional[WeatherForecast]:
         forecastJson = self._get_forecast_json(postCode, self.language)
+        logger.debug("Forecast JSON: %s", forecastJson)
         if forecastJson is None:
             return None
 
