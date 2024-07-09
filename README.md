@@ -19,18 +19,6 @@ It currently supports:
 7. Enter "Swiss Weather" in search box and download the integration
 8. Restart HASS
 
-### Manually
-
-1. Clone this repository in custom components:
-
-```
-git clone https://github.com/izacus/hass-swissweather.git swissweather
-```
-
-__Make sure directory name is `swissweather` or strings won't show up.__
-
-2. Restart HASS
-
 ### Configure integration
 
 1. Add Swiss Weather integration to Home Assistant. You'll be asked for two pieces of information:
