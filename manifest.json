@@ -5,10 +5,8 @@
   "config_flow": true,
   "documentation": "https://github.com/izacus/hass-swissweather",
   "issue_tracker": "https://github.com/izacus/hass-swissweather/issues",
+  "integration_type": "service",
   "requirements": [],
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
   "dependencies": [],
   "codeowners": [
     "@izacus"
