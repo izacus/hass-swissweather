@@ -59,6 +59,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 stations = await self.hass.async_add_executor_job(self.load_station_list)
                 _LOGGER.debug("Stations received.", extra={"Stations": stations})
+                if (self.hass.config.latitude is not None and
+                    self.hass.config.longitude is not None):
+                        stations = sorted(stations, key=lambda it: self._get_distance_to_station(it))
                 options = [SelectOptionDict(value=station.code,
                                             label=self.format_station_name_for_dropdown(station))
                                             for station in stations]
@@ -88,12 +91,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description=f"{user_input[CONF_POST_CODE]} / {station_code}")
 
     def format_station_name_for_dropdown(self, station: WeatherStation) -> str:
+        distance = self._get_distance_to_station(station)
+        if distance is None:
+            return f"{station.name} ({station.canton})"
+        else:
+            return f"{station.name} ({station.canton}) - {distance / 1000:.0f} km away"
+
+    def _get_distance_to_station(self, station: WeatherStation):
         h_lat = self.hass.config.latitude
         h_lng = self.hass.config.longitude
         if h_lat is None or h_lng is None:
-            return f"{station.name} ({station.canton})"
-        else:
-            return f"{station.name} ({station.canton}) - {distance(h_lat, h_lng, station.lat, station.lng) / 1000:.0f} km away"
+            return None
+        return distance(h_lat, h_lng, station.lat, station.lng)
 
     def load_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting station list data...")
