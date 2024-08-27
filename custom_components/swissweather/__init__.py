@@ -47,7 +47,8 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator["SwissWeatherCoordinator
         self._post_code = config_entry.data[CONF_POST_CODE]
         self._client = MeteoClient()
         update_interval = timedelta(minutes=randrange(55, 65))
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
+                         always_update=False)
 
     async def _async_update_data(self) -> Tuple[CurrentState, WeatherForecast]:
         _LOGGER.info("Updating weather data...")

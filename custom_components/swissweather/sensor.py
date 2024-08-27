@@ -22,11 +22,12 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SwissWeatherDataCoordinator
 from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
@@ -75,10 +76,14 @@ async def async_setup_entry(
     entities: list[SwissWeatherSensor] = [SwissWeatherSensor(postCode, stationCode, sensorEntry, coordinator) for sensorEntry in SENSORS]
     async_add_entities(entities)
 
-class SwissWeatherSensor(SensorEntity):
+class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
     def __init__(self, post_code:str, station_code:str, sensor_entry:SwissWeatherSensorEntry, coordinator:SwissWeatherDataCoordinator) -> None:
-        self.entity_description = SensorEntityDescription(key=sensor_entry.key, name=sensor_entry.description, native_unit_of_measurement=sensor_entry.native_unit, device_class=sensor_entry.device_class, state_class=sensor_entry.state_class)
-        self._coordinator = coordinator
+        super().__init__(coordinator)
+        self.entity_description = SensorEntityDescription(key=sensor_entry.key,
+                                                          name=sensor_entry.description,
+                                                          native_unit_of_measurement=sensor_entry.native_unit,
+                                                          device_class=sensor_entry.device_class,
+                                                          state_class=sensor_entry.state_class)
         self._sensor_entry = sensor_entry
         if station_code is None:
             id_combo = f"{post_code}"
@@ -89,21 +94,8 @@ class SwissWeatherSensor(SensorEntity):
         self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
 
     @property
-    def available(self) -> bool:
-        return self._coordinator.last_update_success
-
-    async def async_added_to_hass(self) -> None:
-        """Connect to dispatcher listening for entity data notifications."""
-        self.async_on_remove(
-            self._coordinator.async_add_listener(self.async_write_ha_state)
-        )
-
-    async def async_update(self) -> None:
-        await self._coordinator.async_request_refresh()
-
-    @property
     def native_value(self) -> StateType | Decimal:
-        if self._coordinator.data is None:
+        if self.coordinator.data is None:
             return None
-        currentState = self._coordinator.data[0]
+        currentState = self.coordinator.data[0]
         return self._sensor_entry.data_function(currentState)
