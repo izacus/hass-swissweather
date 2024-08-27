@@ -1,8 +1,8 @@
 """The Swiss Weather integration."""
 from __future__ import annotations
 
-from datetime import timedelta
 import datetime
+from datetime import timedelta
 import logging
 from random import randrange
 from typing import Tuple
@@ -51,21 +51,23 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator["SwissWeatherCoordinator
                          always_update=False)
 
     async def _async_update_data(self) -> Tuple[CurrentState, WeatherForecast]:
-        _LOGGER.info("Updating weather data...")
         if self._station_code is None:
+            _LOGGER.warning("Station code not set, not loading current state.")
             current_state = None
         else:
+            _LOGGER.info("Loading current weather state for %s", self._station_code)
             try:
                 current_state = await self.hass.async_add_executor_job(
                     self._client.get_current_weather_for_station, self._station_code)
-                _LOGGER.debug(f"Current state: {current_state}")
+                _LOGGER.debug("Current state: %s", current_state)
             except Exception as e:
                 _LOGGER.exception(e)
                 current_state = None
 
         try:
+            _LOGGER.info("Loading current forecast for %s", self._post_code)
             current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
-            _LOGGER.debug(f"Current forecast: {current_forecast}")
+            _LOGGER.debug("Current forecast: %s", current_forecast)
             if current_state is None:
                 current = current_forecast.current
                 noValue = (None, None)

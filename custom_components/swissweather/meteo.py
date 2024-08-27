@@ -1,7 +1,6 @@
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
-import functools
 import itertools
 import logging
 from typing import Dict, List, NewType, Optional, Tuple
@@ -138,7 +137,7 @@ class MeteoClient(object):
         logger.debug("Retrieving current weather...")
         data = self._get_current_weather_line_for_station(station)
         if data is None:
-            logger.warning(f"Couldn't find data for station {station}")
+            logger.warning("Couldn't find data for station %s", station)
             return None
 
         return self._get_current_data_for_row(data)
@@ -189,7 +188,7 @@ class MeteoClient(object):
         if sunsetJson is not None:
             sunsets = [datetime.fromtimestamp(epoch / 1000, timezone.utc) for epoch in sunsetJson]
 
-        return WeatherForecast(currentState, dailyForecast, hourlyForecast, sunrises, sunsets)    
+        return WeatherForecast(currentState, dailyForecast, hourlyForecast, sunrises, sunsets)
 
     def _get_current_state(self, forecastJson) -> Optional[CurrentState]:
         if "currentWeather" not in forecastJson:
@@ -261,7 +260,7 @@ class MeteoClient(object):
 
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
-            logger.info("Requesting station data...")
+            logger.debug("Requesting station data...")
             with requests.get(url, stream = True) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
@@ -272,10 +271,10 @@ class MeteoClient(object):
     def _get_forecast_json(self, postCode, language):
         try:
             url = FORECAST_URL.format(postCode)
-            logger.info("Requesting forecast data...")
-            return requests.get(url, headers = 
-                { "User-Agent": FORECAST_USER_AGENT, 
-                    "Accept-Language": language, 
+            logger.debug("Requesting forecast data...")
+            return requests.get(url, headers =
+                { "User-Agent": FORECAST_USER_AGENT,
+                    "Accept-Language": language,
                     "Accept": "application/json" }).json()
         except requests.exceptions.RequestException as e:
             logger.error("Connection failure.", exc_info=1)
