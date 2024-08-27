@@ -2,5 +2,6 @@
     "name": "Swiss Weather",
     "content_in_root": false,
     "render_readme": true,
-    "country": ["CH"]
+    "country": ["CH"],
+    "hide_default_branch": false
 }
