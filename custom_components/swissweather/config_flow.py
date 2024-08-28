@@ -3,17 +3,14 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from functools import cmp_to_key
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import requests
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
@@ -41,7 +38,7 @@ class WeatherStation:
 
     name: str
     code: str
-    altitude: Optional[int]
+    altitude: int | None
     lat: float
     lng: float
     canton: str
@@ -77,7 +74,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_show_form(
                     step_id="user", data_schema=schema
                 )
-            except Exception as e:
+            except Exception:
                 _LOGGER.exception("Failed to retrieve station list, back to manual mode!")
                 # If the API broke, we still give user the option to manually enter the
                 # station code and continue.
@@ -85,7 +82,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     step_id="user", data_schema=STEP_USER_DATA_SCHEMA_BACKUP
                 )
 
-        _LOGGER.info(f"User chose {user_input}")
+        _LOGGER.info("User chose %s", user_input)
         station_code = user_input.get(CONF_STATION_CODE) or "No Station"
         return self.async_create_entry(title="Swiss Weather", data=user_input,
             description=f"{user_input[CONF_POST_CODE]} / {station_code}")
@@ -131,15 +128,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                _float_or_none(row.get("Latitude")),
                                                _float_or_none(row.get("Longitude")),
                                                row.get("Canton")))
-            _LOGGER.info(f"Retrieved {len(stations)} stations.")
+            _LOGGER.info("Retrieved %d stations.", len(stations))
             return stations
 
-def _int_or_none(val: str) -> Optional[int]:
+def _int_or_none(val: str) -> int|None:
     if val is None:
         return None
     return int(val)
 
-def _float_or_none(val: str) -> Optional[float]:
+def _float_or_none(val: str) -> float|None:
     if val is None:
         return None
     return float(val)
