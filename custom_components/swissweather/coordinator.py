@@ -24,7 +24,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[Tuple[CurrentState, Weat
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
         self._post_code = config_entry.data[CONF_POST_CODE]
         self._client = MeteoClient()
-        update_interval = timedelta(minutes=randrange(55, 65))
+        update_interval = timedelta(minutes=10)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
                          always_update=False)
 
