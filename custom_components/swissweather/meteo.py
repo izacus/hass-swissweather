@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/VQHA80.csv'
 
-FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz={}00"
+FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
 CONDITION_CLASSES = {
@@ -270,8 +270,8 @@ class MeteoClient(object):
 
     def _get_forecast_json(self, postCode, language):
         try:
-            url = FORECAST_URL.format(postCode)
-            logger.debug("Requesting forecast data...")
+            url = FORECAST_URL.format(int(postCode))
+            logger.debug("Requesting forecast data from %s...", url)
             return requests.get(url, headers =
                 { "User-Agent": FORECAST_USER_AGENT,
                     "Accept-Language": language,
