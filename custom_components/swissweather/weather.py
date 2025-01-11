@@ -146,7 +146,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         if self._current_forecast is None:
             _LOGGER.info("No hourly forecast available.")
             return None
-        now = datetime.datetime.now(tz=datetime.UTC)
+        now = datetime.datetime.now(tz=datetime.UTC).replace(minute=0, second=0, microsecond=0)
         forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
         return [self.meteo_forecast_to_forecast(entry, True) for entry in forecast_data]
 
