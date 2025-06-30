@@ -156,11 +156,13 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
             wind_speed = meteo_forecast.windSpeed[0]
             wind_bearing = meteo_forecast.windDirection[0]
             wind_gust_speed = meteo_forecast.windGustSpeed[0]
+            sunshine = meteo_forecast.sunshine[0]
         else:
             temperature = meteo_forecast.temperatureMax[0]
             wind_speed = None
             wind_bearing = None
             wind_gust_speed = None
+            sunshine = None
 
         return Forecast(condition=meteo_forecast.condition,
                 datetime=meteo_forecast.timestamp.isoformat(),
@@ -169,4 +171,5 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
                 native_templow=meteo_forecast.temperatureMin[0],
                 native_wind_speed=wind_speed,
                 native_wind_gust_speed=wind_gust_speed,
-                wind_bearing=wind_bearing)
+                wind_bearing=wind_bearing,
+                sunshine=sunshine)

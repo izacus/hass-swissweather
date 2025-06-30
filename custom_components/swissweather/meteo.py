@@ -106,6 +106,7 @@ class Forecast:
     windSpeed: FloatValue | None = None
     windDirection: FloatValue | None = None
     windGustSpeed: FloatValue | None = None
+    sunshine: FloatValue | None = None
 
 @dataclass
 class WeatherForecast(object):
@@ -237,6 +238,7 @@ class MeteoClient(object):
         precipitationList = [ (value, "mm") for value in graphJson.get("precipitation1h", [])]
         windGustSpeedList = [ (value, "km/h") for value in graphJson.get("gustSpeed1h", [])]
         windSpeedList = [ (value, "km/h") for value in graphJson.get("windSpeed1h", [])]
+        sunshineList = [ (value, "min/h") for value in graphJson.get("sunshine1h", [])]
 
         # We get icons only once every 3 hours so we need to expand each elemen 3-times to match
         iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in graphJson.get("weatherIcon3h", [])))
@@ -246,10 +248,10 @@ class MeteoClient(object):
         minForecastHours = min(len(temperatureMaxList), len(temperatureMeanList), len(temperatureMinList), len(precipitationList), len(iconList))
         timestampList = [ startTimestamp + timedelta(hours=value) for value in range(0, minForecastHours) ]
 
-        for ts, icon, tMax, tMean, tMin, precipitation, windDirection, windSpeed, windGustSpeed in zip(timestampList, iconList, temperatureMaxList,
-                                                        temperatureMeanList, temperatureMinList, precipitationList, windDirectionlist, windSpeedList, windGustSpeedList, strict=False):
+        for ts, icon, tMax, tMean, tMin, precipitation, windDirection, windSpeed, windGustSpeed, sunshine in zip(timestampList, iconList, temperatureMaxList,
+                                                        temperatureMeanList, temperatureMinList, precipitationList, windDirectionlist, windSpeedList, windGustSpeedList, sunshineList, strict=False):
             forecast.append(Forecast(ts, icon, ICON_TO_CONDITION_MAP.get(icon), tMax, tMin, precipitation, windSpeed=windSpeed, windDirection=windDirection,
-                                      windGustSpeed=windGustSpeed, temperatureMean=tMean))
+                                      windGustSpeed=windGustSpeed, temperatureMean=tMean, sunshine=sunshine))
         return forecast
 
     def _get_current_weather_line_for_station(self, station):
