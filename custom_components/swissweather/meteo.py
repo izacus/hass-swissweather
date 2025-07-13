@@ -101,6 +101,7 @@ class Forecast:
     temperatureMax: FloatValue
     temperatureMin: FloatValue
     precipitation: FloatValue
+    precipitationProbability: FloatValue | None
     # Only available for hourly forecast
     temperatureMean: FloatValue | None = None
     windSpeed: FloatValue | None = None
@@ -217,7 +218,7 @@ class MeteoClient(object):
             temperatureMax = (to_float(dailyJson.get('temperatureMax', None)), "°C")
             temperatureMin = (to_float(dailyJson.get('temperatureMin', None)), "°C")
             precipitation = (to_float(dailyJson.get('precipitation', None)), "mm")
-            forecast.append(Forecast(timestamp, icon, condition, temperatureMax, temperatureMin, precipitation))
+            forecast.append(Forecast(timestamp, icon, condition, temperatureMax, temperatureMin, precipitation, None))
         return forecast
 
     def _get_hourly_forecast(self, forecastJson) -> list[Forecast] | None:
@@ -243,15 +244,16 @@ class MeteoClient(object):
         # We get icons only once every 3 hours so we need to expand each elemen 3-times to match
         iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in graphJson.get("weatherIcon3h", [])))
         windDirectionlist = list(itertools.chain.from_iterable(itertools.repeat((x, "°"), 3) for x in graphJson.get("windDirection3h", [])))
+        precipitationProbabilityList = list(itertools.chain.from_iterable(itertools.repeat((x, "%"), 3) for x in graphJson.get("precipitationProbability3h", [])))
 
         # This is the minimum amount of data we have
         minForecastHours = min(len(temperatureMaxList), len(temperatureMeanList), len(temperatureMinList), len(precipitationList), len(iconList))
         timestampList = [ startTimestamp + timedelta(hours=value) for value in range(0, minForecastHours) ]
 
-        for ts, icon, tMax, tMean, tMin, precipitation, windDirection, windSpeed, windGustSpeed, sunshine in zip(timestampList, iconList, temperatureMaxList,
-                                                        temperatureMeanList, temperatureMinList, precipitationList, windDirectionlist, windSpeedList, windGustSpeedList, sunshineList, strict=False):
-            forecast.append(Forecast(ts, icon, ICON_TO_CONDITION_MAP.get(icon), tMax, tMin, precipitation, windSpeed=windSpeed, windDirection=windDirection,
-                                      windGustSpeed=windGustSpeed, temperatureMean=tMean, sunshine=sunshine))
+        for ts, icon, tMax, tMean, tMin, precipitation, precipitationProbability, windDirection, windSpeed, windGustSpeed, sunshine in zip(timestampList, iconList, temperatureMaxList,
+                                                        temperatureMeanList, temperatureMinList, precipitationList, precipitationProbabilityList, windDirectionlist, windSpeedList, windGustSpeedList, sunshineList, strict=False):
+            forecast.append(Forecast(ts, icon, ICON_TO_CONDITION_MAP.get(icon), tMax, tMin, precipitation, precipitationProbability=precipitationProbability, 
+                                     windSpeed=windSpeed, windDirection=windDirection, windGustSpeed=windGustSpeed, temperatureMean=tMean, sunshine=sunshine))
         return forecast
 
     def _get_current_weather_line_for_station(self, station):

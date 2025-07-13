@@ -188,7 +188,8 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
 
         return Forecast(condition=meteo_forecast.condition,
                 datetime=meteo_forecast.timestamp.isoformat(),
-                precipitation_probability=self.value_or_none(meteo_forecast.precipitation),
+                precipitation=self.value_or_none(meteo_forecast.precipitation),
+                precipitation_probability=self.value_or_none(meteo_forecast.precipitationProbability),
                 temperature=temperature,
                 templow=self.value_or_none(meteo_forecast.temperatureMin),
                 wind_speed=wind_speed,
