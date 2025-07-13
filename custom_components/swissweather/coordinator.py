@@ -3,22 +3,20 @@
 import datetime
 from datetime import timedelta
 import logging
-from random import randrange
-from typing import Tuple
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import CurrentState, CurrentWeather, MeteoClient, WeatherForecast
+from .meteo import CurrentWeather, MeteoClient, WeatherForecast
 
 _LOGGER = logging.getLogger(__name__)
 
-class SwissWeatherDataCoordinator(DataUpdateCoordinator[Tuple[CurrentState, WeatherForecast]]):
+class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | None, WeatherForecast | None]]):
     """Coordinates data loads for all sensors."""
 
-    _client : MeteoClient = None
+    _client : MeteoClient
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
@@ -28,7 +26,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[Tuple[CurrentState, Weat
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
                          always_update=False)
 
-    async def _async_update_data(self) -> Tuple[CurrentState, WeatherForecast]:
+    async def _async_update_data(self) -> tuple[CurrentWeather | None, WeatherForecast | None]:
         if self._station_code is None:
             _LOGGER.warning("Station code not set, not loading current state.")
             current_state = None
@@ -47,9 +45,11 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[Tuple[CurrentState, Weat
             current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
             _LOGGER.debug("Current forecast: %s", current_forecast)
             if current_state is None:
-                current = current_forecast.current
-                noValue = (None, None)
-                current_state = CurrentWeather(None, datetime.datetime.now(tz=datetime.UTC), current.currentTemperature, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue, noValue)
+                current = None
+                if current_forecast is not None:
+                    current = current_forecast.current
+                if current is not None:
+                    current_state = CurrentWeather(None, datetime.datetime.now(tz=datetime.UTC), current.currentTemperature, None, None, None, None, None, None, None, None, None, None, None)
         except Exception as e:
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e

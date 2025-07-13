@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import itertools
 import logging
-from typing import List, NewType
+from typing import NewType
 
 import requests
 
@@ -55,7 +55,7 @@ def to_int(string: str) -> int | None:
     except ValueError:
         return None
 
-FloatValue = NewType('FloatValue', tuple[float | None, str])
+FloatValue = NewType('FloatValue', tuple[float | None, str | None])
 
 @dataclass
 class StationInfo:
@@ -72,20 +72,20 @@ class StationInfo:
 
 @dataclass
 class CurrentWeather:
-    station: StationInfo
+    station: StationInfo | None
     date: datetime
-    airTemperature: FloatValue
-    precipitation: FloatValue
-    sunshine: FloatValue
-    globalRadiation: FloatValue
-    relativeHumidity: FloatValue
-    dewPoint: FloatValue
-    windDirection: FloatValue
-    windSpeed: FloatValue
-    gustPeak1s: FloatValue
-    pressureStationLevel: FloatValue
-    pressureSeaLevel: FloatValue
-    pressureSeaLevelAtStandardAtmosphere: FloatValue
+    airTemperature: FloatValue | None
+    precipitation: FloatValue | None
+    sunshine: FloatValue | None
+    globalRadiation: FloatValue | None
+    relativeHumidity: FloatValue | None
+    dewPoint: FloatValue | None
+    windDirection: FloatValue | None
+    windSpeed: FloatValue | None
+    gustPeak1s: FloatValue | None
+    pressureStationLevel: FloatValue | None
+    pressureSeaLevel: FloatValue | None
+    pressureSeaLevelAtStandardAtmosphere: FloatValue | None
 
 @dataclass
 class CurrentState:
@@ -110,11 +110,11 @@ class Forecast:
 
 @dataclass
 class WeatherForecast(object):
-    current: CurrentState
-    dailyForecast: list[Forecast]
-    hourlyForecast: list[Forecast]
-    sunrise: list[datetime]
-    sunset: list[datetime]
+    current: CurrentState | None
+    dailyForecast: list[Forecast] | None
+    hourlyForecast: list[Forecast] | None
+    sunrise: list[datetime] | None
+    sunset: list[datetime] | None
 
 class MeteoClient(object):
     language: str = "en"
@@ -204,7 +204,7 @@ class MeteoClient(object):
             currentIcon, currentCondition)
 
     def _get_daily_forecast(self, forecastJson) -> list[Forecast] | None:
-        forecast: List[Forecast] = []
+        forecast: list[Forecast] = []
         if "forecast" not in forecastJson:
             return forecast
 
