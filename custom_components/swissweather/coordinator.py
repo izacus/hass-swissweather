@@ -8,8 +8,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import CurrentWeather, MeteoClient, WeatherForecast
+from .pollen import CurrentPollen, PollenClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,3 +55,30 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e
         return (current_state, current_forecast)
+
+class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
+    """ Coordinates loading of pollen data. """
+
+    _client: PollenClient
+
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+        self._pollen_station_code = config_entry.data.get(CONF_POLLEN_STATION_CODE)
+        self._client = PollenClient()
+        update_interval = timedelta(minutes=60)
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
+            always_update=False)
+
+    async def _async_update_data(self) -> CurrentPollen | None:
+        current_state = None
+        if self._pollen_station_code is None:
+            _LOGGER.warning("Pollen code not set, not loading current state.")
+        else:
+            _LOGGER.info("Loading current pollen state for %s", self._pollen_station_code)
+            try:
+                current_state = await self.hass.async_add_executor_job(
+                    self._client.get_current_pollen_for_station, self._pollen_station_code)
+                _LOGGER.debug("Current state: %s", current_state)
+            except Exception as e:
+                _LOGGER.exception(e)
+                raise UpdateFailed(f"Update failed: {e}") from e
+        return current_state

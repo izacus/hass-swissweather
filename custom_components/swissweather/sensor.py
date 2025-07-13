@@ -5,6 +5,8 @@ from decimal import Decimal
 import logging
 from typing import Callable
 
+from propcache.api import cached_property
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -13,6 +15,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    CONCENTRATION_PARTS_PER_CUBIC_METER,
     DEGREE,
     PERCENTAGE,
     UnitOfIrradiance,
@@ -29,9 +32,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import SwissWeatherDataCoordinator
-from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from . import (
+    SwissPollenDataCoordinator,
+    SwissWeatherDataCoordinator,
+    get_pollen_coordinator_key,
+    get_weather_coordinator_key,
+)
+from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import CurrentWeather
+from .pollen import CurrentPollen
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +52,12 @@ class SwissWeatherSensorEntry:
     native_unit: str
     device_class: SensorDeviceClass
     state_class: SensorStateClass
+
+@dataclass
+class SwissPollenSensorEntry:
+    key: str
+    description: str
+    data_function: Callable[[CurrentPollen], StateType | Decimal]
 
 def first_or_none(value):
     if value is None or len(value) < 1:
@@ -65,19 +80,41 @@ SENSORS: list[SwissWeatherSensorEntry] = [
     SwissWeatherSensorEntry("pressure_qnh", "Air Pressure - Sea Level (QNH)", lambda weather: first_or_none(weather.pressureSeaLevelAtStandardAtmosphere), UnitOfPressure.HPA, SensorDeviceClass.PRESSURE, SensorStateClass.MEASUREMENT)
 ]
 
+POLLEN_SENSORS: list[SwissPollenSensorEntry] = [
+    SwissPollenSensorEntry("birch", "Pollen - Birch", lambda pollen: first_or_none(pollen.birch)),
+    SwissPollenSensorEntry("grasses", "Pollen - Grasses", lambda pollen: first_or_none(pollen.grasses)),
+    SwissPollenSensorEntry("alder", "Pollen - Alder", lambda pollen: first_or_none(pollen.alder)),
+    SwissPollenSensorEntry("hazel", "Pollen - Hazel", lambda pollen: first_or_none(pollen.hazel)),
+    SwissPollenSensorEntry("beech", "Pollen - Beech", lambda pollen: first_or_none(pollen.beech)),
+    SwissPollenSensorEntry("ash", "Pollen - Ash", lambda pollen: first_or_none(pollen.ash)),
+    SwissPollenSensorEntry("oak", "Pollen - Oak", lambda pollen: first_or_none(pollen.oak)),
+]
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][get_weather_coordinator_key(config_entry)]
     postCode: str = config_entry.data[CONF_POST_CODE]
     stationCode: str = config_entry.data.get(CONF_STATION_CODE)
-    entities: list[SwissWeatherSensor] = [SwissWeatherSensor(postCode, stationCode, sensorEntry, coordinator) for sensorEntry in SENSORS]
+    pollenStationCode: str = config_entry.data.get(CONF_POLLEN_STATION_CODE)
+    if stationCode is None:
+            id_combo = f"{postCode}"
+    else:
+        id_combo = f"{postCode}-{stationCode}"
+    deviceInfo = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
+    entities: list[SwissWeatherSensor|SwissPollenSensor] = [SwissWeatherSensor(postCode, deviceInfo, sensorEntry, coordinator) for sensorEntry in SENSORS]
+
+    if pollenStationCode is not None:
+        pollenCoordinator = hass.data[DOMAIN][get_pollen_coordinator_key(config_entry)]
+        entities += [SwissPollenSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS]
+
     async_add_entities(entities)
 
+
 class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
-    def __init__(self, post_code:str, station_code:str, sensor_entry:SwissWeatherSensorEntry, coordinator:SwissWeatherDataCoordinator) -> None:
+    def __init__(self, post_code:str, device_info: DeviceInfo, sensor_entry:SwissWeatherSensorEntry, coordinator:SwissWeatherDataCoordinator) -> None:
         super().__init__(coordinator)
         self.entity_description = SensorEntityDescription(key=sensor_entry.key,
                                                           name=sensor_entry.description,
@@ -85,17 +122,33 @@ class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorE
                                                           device_class=sensor_entry.device_class,
                                                           state_class=sensor_entry.state_class)
         self._sensor_entry = sensor_entry
-        if station_code is None:
-            id_combo = f"{post_code}"
-        else:
-            id_combo = f"{post_code}-{station_code}"
         self._attr_name = f"{sensor_entry.description} at {post_code}"
         self._attr_unique_id = f"{post_code}.{sensor_entry.key}"
-        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
+        self._attr_device_info = device_info
 
     @property
     def native_value(self) -> StateType | Decimal:
         if self.coordinator.data is None:
             return None
         currentState = self.coordinator.data[0]
+        return self._sensor_entry.data_function(currentState)
+
+class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEntity):
+
+    def __init__(self, post_code:str, station_code: str, device_info: DeviceInfo, sensor_entry:SwissPollenSensorEntry, coordinator:SwissPollenDataCoordinator) -> None:
+        super().__init__(coordinator)
+        self.entity_description = SensorEntityDescription(key=sensor_entry.key,
+                                                        name=sensor_entry.description,
+                                                        native_unit_of_measurement=CONCENTRATION_PARTS_PER_CUBIC_METER,
+                                                        state_class=SensorStateClass.MEASUREMENT)
+        self._sensor_entry = sensor_entry
+        self._attr_name = f"{sensor_entry.description} at {post_code} - {station_code}"
+        self._attr_unique_id = f"pollen-{post_code}.{sensor_entry.key}"
+        self._attr_device_info = device_info
+
+    @property
+    def native_value(self) -> StateType | Decimal:
+        if self.coordinator.data is None:
+            return None
+        currentState = self.coordinator.data
         return self._sensor_entry.data_function(currentState)

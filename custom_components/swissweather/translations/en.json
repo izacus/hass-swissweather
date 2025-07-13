@@ -12,7 +12,8 @@
             "user": {
                 "data": {
                     "stationCode": "Weather station for current weather state",
-                    "postCode": "Post number for forecast data"
+                    "postCode": "Post number for forecast data",
+                    "pollenStationCode": "Pollen measuring station"
                 }
             }
         }

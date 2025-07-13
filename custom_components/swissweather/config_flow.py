@@ -19,7 +19,10 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util.location import distance
 
-from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import CONF_POST_CODE, CONF_STATION_CODE, CONF_POLLEN_STATION_CODE, DOMAIN
+
+from swiss_pollen import Measurement, Plant, PollenService, Station
+
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
 
@@ -29,6 +32,7 @@ STEP_USER_DATA_SCHEMA_BACKUP = vol.Schema(
     {
         vol.Required(CONF_POST_CODE): str,
         vol.Optional(CONF_STATION_CODE): str,
+        vol.Optional(CONF_POLLEN_STATION_CODE): str,
     }
 )
 
@@ -59,14 +63,29 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if (self.hass.config.latitude is not None and
                     self.hass.config.longitude is not None):
                         stations = sorted(stations, key=lambda it: self._get_distance_to_station(it))
-                options = [SelectOptionDict(value=station.code,
+                station_options = [SelectOptionDict(value=station.code,
                                             label=self.format_station_name_for_dropdown(station))
                                             for station in stations]
+
+                pollen_stations = await self.hass.async_add_executor_job(self.load_pollen_station_list)
+                if (self.hass.config.latitude is not None and
+                    self.hass.config.longitude is not None):
+                        stations = sorted(pollen_stations, key=lambda it: self._get_distance_to_station(it))
+                pollen_station_options = [SelectOptionDict(value=station.code,
+                                            label=self.format_station_name_for_dropdown(station))
+                                            for station in stations]
+
                 schema = vol.Schema({
                     vol.Required(CONF_POST_CODE): str,
                     vol.Optional(CONF_STATION_CODE): SelectSelector(
                         SelectSelectorConfig(
-                            options=options,
+                            options=station_options,
+                            mode=SelectSelectorMode.DROPDOWN
+                        )
+                    ),
+                    vol.Optional(CONF_POLLEN_STATION_CODE): SelectSelector(
+                        SelectSelectorConfig(
+                            options=pollen_station_options,
                             mode=SelectSelectorMode.DROPDOWN
                         )
                     )
@@ -130,6 +149,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                row.get("Canton")))
             _LOGGER.info("Retrieved %d stations.", len(stations))
             return stations
+
+    def load_pollen_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
+        _LOGGER.info("Requesting pollen station list data...")
+        current_values: dict[Station, list[Measurement]] = PollenService.current_values()
+
+        stations = []
+        for station in current_values:
+            _LOGGER.debug(station)
+            stations.append(WeatherStation(
+                station.name,
+                station.code,
+                station.altitude,
+                station.latlong[0],
+                station.latlong[1],
+                station.canton
+            ))
+        return stations
 
 def _int_or_none(val: str) -> int|None:
     if val is None:

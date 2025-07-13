@@ -20,8 +20,8 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import SwissWeatherDataCoordinator
-from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from . import SwissWeatherDataCoordinator, get_weather_coordinator_key
+from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import (
     CurrentWeather,
     FloatValue,
@@ -36,10 +36,11 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][get_weather_coordinator_key(config_entry)]
     async_add_entities(
         [
-            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], config_entry.data.get(CONF_STATION_CODE)),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], config_entry.data.get(CONF_STATION_CODE),
+                         config_entry.data.get(CONF_POLLEN_STATION_CODE)),
         ]
     )
 
@@ -50,9 +51,10 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         coordinator: SwissWeatherDataCoordinator,
         postCode: str,
         stationCode: str,
+        pollenStationCode: str,
     ) -> None:
         super().__init__(coordinator)
-        if stationCode is None:
+        if stationCode is None and pollenStationCode is None:
             id_combo = f"{postCode}"
         else:
             id_combo = f"{postCode}-{stationCode}"
@@ -62,13 +64,13 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
                                             suggested_area=None,
                                             identifiers={(DOMAIN, f"swissweather-{id_combo}")})
 
-    @cached_property
+    @property
     def _current_state(self) -> CurrentWeather | None:
         if self.coordinator.data is None:
             return None
         return self.coordinator.data[0]
 
-    @cached_property
+    @property
     def _current_forecast(self) -> WeatherForecast | None:
         if self.coordinator.data is None or len(self.coordinator.data) < 2:
             return None
@@ -88,7 +90,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
             return None
         return self._current_forecast.current.currentCondition
 
-    @cached_property
+    @property
     def native_temperature(self) -> float | None:
         if self._current_state is not None and \
             self._current_state.airTemperature is not None:
@@ -107,7 +109,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     def native_precipitation_unit(self) -> str | None:
         return UnitOfPrecipitationDepth.MILLIMETERS
 
-    @cached_property
+    @property
     def native_wind_speed(self) -> float | None:
         if self._current_state is not None and \
             self._current_state.windSpeed is not None:
@@ -118,21 +120,21 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     def native_wind_speed_unit(self) -> str | None:
         return UnitOfSpeed.KILOMETERS_PER_HOUR
 
-    @cached_property
+    @property
     def humidity(self) -> float | None:
         if self._current_state is not None and \
             self._current_state.relativeHumidity is not None:
             return self._current_state.relativeHumidity[0]
         return None
 
-    @cached_property
+    @property
     def wind_bearing(self) -> float | str | None:
         if self._current_state is not None and \
             self._current_state.windDirection is not None:
             return self._current_state.windDirection[0]
         return None
 
-    @cached_property
+    @property
     def native_pressure(self) -> float | None:
         if self._current_state is not None and \
             self._current_state.pressureStationLevel is not None:
