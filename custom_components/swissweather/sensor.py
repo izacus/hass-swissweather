@@ -40,7 +40,7 @@ from . import (
 )
 from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import CurrentWeather
-from .pollen import CurrentPollen
+from .pollen import CurrentPollen, PollenLevel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ class SwissPollenSensorEntry:
     key: str
     description: str
     data_function: Callable[[CurrentPollen], StateType | Decimal]
+    device_class: SensorDeviceClass | None
 
 def first_or_none(value):
     if value is None or len(value) < 1:
@@ -81,13 +82,14 @@ SENSORS: list[SwissWeatherSensorEntry] = [
 ]
 
 POLLEN_SENSORS: list[SwissPollenSensorEntry] = [
-    SwissPollenSensorEntry("birch", "Pollen - Birch", lambda pollen: first_or_none(pollen.birch)),
-    SwissPollenSensorEntry("grasses", "Pollen - Grasses", lambda pollen: first_or_none(pollen.grasses)),
-    SwissPollenSensorEntry("alder", "Pollen - Alder", lambda pollen: first_or_none(pollen.alder)),
-    SwissPollenSensorEntry("hazel", "Pollen - Hazel", lambda pollen: first_or_none(pollen.hazel)),
-    SwissPollenSensorEntry("beech", "Pollen - Beech", lambda pollen: first_or_none(pollen.beech)),
-    SwissPollenSensorEntry("ash", "Pollen - Ash", lambda pollen: first_or_none(pollen.ash)),
-    SwissPollenSensorEntry("oak", "Pollen - Oak", lambda pollen: first_or_none(pollen.oak)),
+    SwissPollenSensorEntry("pollen-time", "Pollen Time", lambda pollen: pollen.timestamp, SensorDeviceClass.TIMESTAMP),
+    SwissPollenSensorEntry("birch", "Pollen - Birch", lambda pollen: first_or_none(pollen.birch), None),
+    SwissPollenSensorEntry("grasses", "Pollen - Grasses", lambda pollen: first_or_none(pollen.grasses), None),
+    SwissPollenSensorEntry("alder", "Pollen - Alder", lambda pollen: first_or_none(pollen.alder), None),
+    SwissPollenSensorEntry("hazel", "Pollen - Hazel", lambda pollen: first_or_none(pollen.hazel), None),
+    SwissPollenSensorEntry("beech", "Pollen - Beech", lambda pollen: first_or_none(pollen.beech), None),
+    SwissPollenSensorEntry("ash", "Pollen - Ash", lambda pollen: first_or_none(pollen.ash), None),
+    SwissPollenSensorEntry("oak", "Pollen - Oak", lambda pollen: first_or_none(pollen.oak), None),
 ]
 
 async def async_setup_entry(
@@ -109,6 +111,7 @@ async def async_setup_entry(
     if pollenStationCode is not None:
         pollenCoordinator = hass.data[DOMAIN][get_pollen_coordinator_key(config_entry)]
         entities += [SwissPollenSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS]
+        entities += [SwissPollenLevelSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS if sensorEntry.device_class is None]
 
     async_add_entities(entities)
 
@@ -125,6 +128,7 @@ class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorE
         self._attr_name = f"{sensor_entry.description} at {post_code}"
         self._attr_unique_id = f"{post_code}.{sensor_entry.key}"
         self._attr_device_info = device_info
+        self._attr_attribution = "Source: MeteoSwiss"
 
     @property
     def native_value(self) -> StateType | Decimal:
@@ -137,14 +141,22 @@ class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEnt
 
     def __init__(self, post_code:str, station_code: str, device_info: DeviceInfo, sensor_entry:SwissPollenSensorEntry, coordinator:SwissPollenDataCoordinator) -> None:
         super().__init__(coordinator)
+        state_class = SensorStateClass.MEASUREMENT
+        unit = CONCENTRATION_PARTS_PER_CUBIC_METER
+        if sensor_entry.device_class is SensorDeviceClass.TIMESTAMP:
+            state_class = None
+            unit = None
         self.entity_description = SensorEntityDescription(key=sensor_entry.key,
                                                         name=sensor_entry.description,
-                                                        native_unit_of_measurement=CONCENTRATION_PARTS_PER_CUBIC_METER,
-                                                        state_class=SensorStateClass.MEASUREMENT)
+                                                        native_unit_of_measurement=unit,
+                                                        state_class=state_class)
         self._sensor_entry = sensor_entry
         self._attr_name = f"{sensor_entry.description} at {post_code} - {station_code}"
         self._attr_unique_id = f"pollen-{post_code}.{sensor_entry.key}"
         self._attr_device_info = device_info
+        self._attr_device_class = sensor_entry.device_class
+        self._attr_suggested_display_precision = 0
+        self._attr_attribution = "Source: MeteoSwiss"
 
     @property
     def native_value(self) -> StateType | Decimal:
@@ -152,3 +164,44 @@ class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEnt
             return None
         currentState = self.coordinator.data
         return self._sensor_entry.data_function(currentState)
+
+    @cached_property
+    def icon(self):
+        return "mdi:flower-pollen"
+
+class SwissPollenLevelSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEntity):
+
+    def __init__(self, post_code:str, station_code: str, device_info: DeviceInfo, sensor_entry:SwissPollenSensorEntry, coordinator:SwissPollenDataCoordinator) -> None:
+        super().__init__(coordinator)
+        self.entity_description = SensorEntityDescription(key=sensor_entry.key,
+                                                        name=sensor_entry.description,
+                                                        device_class=SensorDeviceClass.ENUM)
+        self._sensor_entry = sensor_entry
+        self._attr_name = f"{sensor_entry.description} level at {post_code} - {station_code}"
+        self._attr_unique_id = f"pollen-level-{post_code}.{sensor_entry.key}"
+        self._attr_device_info = device_info
+        self._attr_options = [PollenLevel.NONE, PollenLevel.LOW, PollenLevel.MEDIUM, PollenLevel.STRONG, PollenLevel.VERY_STRONG]
+        self._attr_attribution = "Source: MeteoSwiss"
+
+    @property
+    def native_value(self) -> StateType | Decimal:
+        if self.coordinator.data is None:
+            return None
+        currentState = self.coordinator.data
+        value = self._sensor_entry.data_function(currentState)
+        if value is not None:
+            if value == 0:
+                return PollenLevel.NONE
+            elif value <= 10:
+                return PollenLevel.LOW
+            elif value <= 70:
+                return PollenLevel.MEDIUM
+            elif value <= 250:
+                return PollenLevel.STRONG
+            else:
+                return PollenLevel.VERY_STRONG
+        return None
+
+    @cached_property
+    def icon(self):
+        return "mdi:flower-pollen-outline"

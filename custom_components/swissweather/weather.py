@@ -63,6 +63,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
                                             name=f"MeteoSwiss at {id_combo}",
                                             suggested_area=None,
                                             identifiers={(DOMAIN, f"swissweather-{id_combo}")})
+        self._attr_attribution = "Source: MeteoSwiss"
 
     @property
     def _current_state(self) -> CurrentWeather | None:

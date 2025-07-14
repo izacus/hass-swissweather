@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 import logging
 
 from swiss_pollen import Measurement, Plant, PollenService, Station
@@ -7,6 +8,15 @@ from swiss_pollen import Measurement, Plant, PollenService, Station
 from .meteo import FloatValue
 
 logger = logging.getLogger(__name__)
+
+
+class PollenLevel(StrEnum):
+    """ Marks pollen level """
+    NONE = "None"
+    LOW = "Low"
+    MEDIUM = "Medium"
+    STRONG = "Strong"
+    VERY_STRONG = "Very Strong"
 
 @dataclass
 class CurrentPollen(object):
