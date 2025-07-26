@@ -77,7 +77,7 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
             try:
                 current_state = await self.hass.async_add_executor_job(
                     self._client.get_current_pollen_for_station, self._pollen_station_code)
-                _LOGGER.debug("Current state: %s", current_state)
+                _LOGGER.debug("Current pollen: %s", current_state)
             except Exception as e:
                 _LOGGER.exception(e)
                 raise UpdateFailed(f"Update failed: {e}") from e

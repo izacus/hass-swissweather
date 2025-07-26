@@ -102,7 +102,7 @@ async def async_setup_entry(
     stationCode: str = config_entry.data.get(CONF_STATION_CODE)
     pollenStationCode: str = config_entry.data.get(CONF_POLLEN_STATION_CODE)
     if stationCode is None:
-            id_combo = f"{postCode}"
+        id_combo = f"{postCode}"
     else:
         id_combo = f"{postCode}-{stationCode}"
     deviceInfo = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})

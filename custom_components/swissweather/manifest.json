@@ -11,5 +11,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/izacus/hass-swissweather/issues",
   "requirements": ["swiss-pollen==1.0.3"],
-  "version": "1.1.2"
+  "version": "1.1.3"
 }

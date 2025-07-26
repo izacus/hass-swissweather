@@ -3,8 +3,6 @@ from __future__ import annotations
 import datetime
 import logging
 
-from propcache.api import cached_property
-
 from homeassistant.components.weather import Forecast, WeatherEntity
 from homeassistant.components.weather.const import WeatherEntityFeature
 from homeassistant.config_entries import ConfigEntry
@@ -21,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SwissWeatherDataCoordinator, get_weather_coordinator_key
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 from .meteo import (
     CurrentWeather,
     FloatValue,
@@ -39,30 +37,31 @@ async def async_setup_entry(
     coordinator: SwissWeatherDataCoordinator = hass.data[DOMAIN][get_weather_coordinator_key(config_entry)]
     async_add_entities(
         [
-            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], config_entry.data.get(CONF_STATION_CODE),
-                         config_entry.data.get(CONF_POLLEN_STATION_CODE)),
+            SwissWeather(coordinator, config_entry.data[CONF_POST_CODE], config_entry.data.get(CONF_STATION_CODE)),
         ]
     )
 
 class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity):
+
+    @staticmethod
+    def value_or_none(value: FloatValue | None) -> float | None:
+        if value is None or len(value) < 2:
+            return None
+        return value[0]
 
     def __init__(
         self,
         coordinator: SwissWeatherDataCoordinator,
         postCode: str,
         stationCode: str,
-        pollenStationCode: str,
     ) -> None:
         super().__init__(coordinator)
-        if stationCode is None and pollenStationCode is None:
+        if stationCode is None:
             id_combo = f"{postCode}"
         else:
             id_combo = f"{postCode}-{stationCode}"
+        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
         self._postCode = postCode
-        self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE,
-                                            name=f"MeteoSwiss at {id_combo}",
-                                            suggested_area=None,
-                                            identifiers={(DOMAIN, f"swissweather-{id_combo}")})
         self._attr_attribution = "Source: MeteoSwiss"
 
     @property
@@ -77,76 +76,72 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
             return None
         return self.coordinator.data[1]
 
-    @cached_property
+    @property
     def unique_id(self) -> str | None:
         return f"swiss_weather.{self._postCode}"
 
-    @cached_property
+    @property
     def name(self):
         return f"Weather at {self._postCode}"
 
-    @cached_property
+    @property
     def condition(self) -> str | None:
-        if self._current_forecast is None or self._current_forecast.current is None:
+        forecast = self._current_forecast
+        if forecast is None or forecast.current is None:
             return None
-        return self._current_forecast.current.currentCondition
+        return forecast.current.currentCondition
 
     @property
     def native_temperature(self) -> float | None:
-        if self._current_state is not None and \
-            self._current_state.airTemperature is not None:
-            return self._current_state.airTemperature[0]
-        if self._current_forecast is not None and \
-            self._current_forecast.current is not None and \
-            self._current_forecast.current.currentTemperature is not None:
-                return self._current_forecast.current.currentTemperature[0]
+        state = self._current_state
+        if state is not None:
+            return self.value_or_none(state.airTemperature)
+        forecast = self._current_forecast
+        if forecast is not None and forecast.current is not None:
+            return self.value_or_none(forecast.current.currentTemperature)
         return None
 
-    @cached_property
+    @property
     def native_temperature_unit(self) -> str | None:
         return UnitOfTemperature.CELSIUS
 
-    @cached_property
+    @property
     def native_precipitation_unit(self) -> str | None:
         return UnitOfPrecipitationDepth.MILLIMETERS
 
     @property
     def native_wind_speed(self) -> float | None:
-        if self._current_state is not None and \
-            self._current_state.windSpeed is not None:
-            return self._current_state.windSpeed[0]
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.windSpeed)
         return None
 
-    @cached_property
+    @property
     def native_wind_speed_unit(self) -> str | None:
         return UnitOfSpeed.KILOMETERS_PER_HOUR
 
     @property
     def humidity(self) -> float | None:
-        if self._current_state is not None and \
-            self._current_state.relativeHumidity is not None:
-            return self._current_state.relativeHumidity[0]
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.relativeHumidity)
         return None
 
     @property
     def wind_bearing(self) -> float | str | None:
-        if self._current_state is not None and \
-            self._current_state.windDirection is not None:
-            return self._current_state.windDirection[0]
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.windDirection)
         return None
 
     @property
     def native_pressure(self) -> float | None:
-        if self._current_state is not None and \
-            self._current_state.pressureStationLevel is not None:
-            return self._current_state.pressureStationLevel[0]
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.pressureStationLevel)
         return None
 
-    @cached_property
+    @property
     def native_pressure_unit(self) -> str | None:
         return UnitOfPressure.HPA
 
-    @cached_property
+    @property
     def supported_features(self) -> int | None:
         return WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
 
@@ -168,12 +163,6 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         now = datetime.datetime.now(tz=datetime.UTC).replace(minute=0, second=0, microsecond=0)
         forecast_data = list(filter(lambda forecast: forecast.timestamp >= now, self._current_forecast.hourlyForecast))
         return [self.meteo_forecast_to_forecast(entry, True) for entry in forecast_data]
-
-    @staticmethod
-    def value_or_none(value: FloatValue | None) -> float | None:
-        if value is None or len(value) < 2:
-            return None
-        return value[0]
 
     def meteo_forecast_to_forecast(self, meteo_forecast: MeteoForecast, isHourly) -> Forecast:
         if isHourly:
