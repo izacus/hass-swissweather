@@ -9,7 +9,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import CurrentWeather, MeteoClient, WeatherForecast
+from .meteo import (
+    CurrentWeather,
+    MeteoClient,
+    Warning,
+    WarningLevel,
+    WarningType,
+    WeatherForecast,
+)
 from .pollen import CurrentPollen, PollenClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,7 +64,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
         return (current_state, current_forecast)
 
 class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
-    """ Coordinates loading of pollen data. """
+    """Coordinates loading of pollen data."""
 
     _client: PollenClient
 
