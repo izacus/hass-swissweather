@@ -42,6 +42,10 @@ def to_float(string: str) -> float | None:
     if string is None:
         return None
 
+    # Awesome CSV dataset.
+    if string == '-':
+        return None
+
     try:
         return float(string)
     except ValueError:
@@ -50,6 +54,10 @@ def to_float(string: str) -> float | None:
 
 def to_int(string: str) -> int | None:
     if string is None:
+        return None
+
+    # Awesome CSV dataset.
+    if string == '-':
         return None
 
     try:
@@ -340,7 +348,7 @@ class MeteoClient:
 
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
-            logger.debug("Requesting station data...")
+            logger.debug("Requesting station data from %s...", url)
             with requests.get(url, stream = True) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
