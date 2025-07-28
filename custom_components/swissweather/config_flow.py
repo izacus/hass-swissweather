@@ -7,10 +7,11 @@ import logging
 from typing import Any
 
 import requests
+from swiss_pollen import Measurement, PollenService, Station
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import SOURCE_RECONFIGURE, ConfigFlowResult
 from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
@@ -19,10 +20,7 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util.location import distance
 
-from .const import CONF_POST_CODE, CONF_STATION_CODE, CONF_POLLEN_STATION_CODE, DOMAIN
-
-from swiss_pollen import Measurement, Plant, PollenService, Station
-
+from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
 
@@ -54,34 +52,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         if user_input is None:
             try:
-                stations = await self.hass.async_add_executor_job(self.load_station_list)
-                _LOGGER.debug("Stations received.", extra={"Stations": stations})
-                if (self.hass.config.latitude is not None and
-                    self.hass.config.longitude is not None):
-                        stations = sorted(stations, key=lambda it: self._get_distance_to_station(it))
-                station_options = [SelectOptionDict(value=station.code,
-                                            label=self.format_station_name_for_dropdown(station))
-                                            for station in stations]
+                station_options = await self._get_weather_station_options()
+                pollen_station_options = await self._get_pollen_station_options()
 
-                pollen_stations = await self.hass.async_add_executor_job(self.load_pollen_station_list)
-                if (self.hass.config.latitude is not None and
-                    self.hass.config.longitude is not None):
-                        stations = sorted(pollen_stations, key=lambda it: self._get_distance_to_station(it))
-                pollen_station_options = [SelectOptionDict(value=station.code,
-                                            label=self.format_station_name_for_dropdown(station))
-                                            for station in stations]
-
+                # Setup defaults if we're reconfiguring
                 schema = vol.Schema({
                     vol.Required(CONF_POST_CODE): str,
                     vol.Optional(CONF_STATION_CODE): SelectSelector(
                         SelectSelectorConfig(
                             options=station_options,
                             mode=SelectSelectorMode.DROPDOWN
-                        )
+                        ),
                     ),
                     vol.Optional(CONF_POLLEN_STATION_CODE): SelectSelector(
                         SelectSelectorConfig(
@@ -98,13 +83,55 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # If the API broke, we still give user the option to manually enter the
                 # station code and continue.
                 return self.async_show_form(
-                    step_id="user", data_schema=STEP_USER_DATA_SCHEMA_BACKUP
+                    data_schema=STEP_USER_DATA_SCHEMA_BACKUP
                 )
 
         _LOGGER.info("User chose %s", user_input)
         station_code = user_input.get(CONF_STATION_CODE) or "No Station"
-        return self.async_create_entry(title="Swiss Weather", data=user_input,
-            description=f"{user_input[CONF_POST_CODE]} / {station_code}")
+        post_code = user_input.get(CONF_POST_CODE)
+        pollen_station_code = user_input.get(CONF_POLLEN_STATION_CODE)
+        return self.async_create_entry(title=f"Weather at {post_code} / {station_code or "No weather station"} / {pollen_station_code or "No pollen station"}", data=user_input,
+            description=f"{user_input[CONF_POST_CODE]}")
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the reconfigure step."""
+        _LOGGER.info("Reconfigure with user dict %s", user_input)
+
+        if user_input:
+            self._abort_if_unique_id_mismatch()
+            reconfigure_entry = self._get_reconfigure_entry()
+            return self.async_update_reload_and_abort(
+                reconfigure_entry, data_updates=user_input
+            )
+
+        station_options = await self._get_weather_station_options()
+        pollen_station_options = await self._get_pollen_station_options()
+
+        reconfigure_entry = self._get_reconfigure_entry()
+        default_station_code = None
+        default_pollen_station_code = None
+        if reconfigure_entry is not None:
+            default_station_code = reconfigure_entry.data.get(CONF_STATION_CODE)
+            default_pollen_station_code = reconfigure_entry.data.get(CONF_POLLEN_STATION_CODE)
+        schema = vol.Schema({
+            vol.Optional(CONF_STATION_CODE, default=default_station_code): SelectSelector(
+                SelectSelectorConfig(
+                    options=station_options,
+                    mode=SelectSelectorMode.DROPDOWN
+                ),
+            ),
+            vol.Optional(CONF_POLLEN_STATION_CODE, default=default_pollen_station_code): SelectSelector(
+                SelectSelectorConfig(
+                    options=pollen_station_options,
+                    mode=SelectSelectorMode.DROPDOWN
+                )
+            )
+        })
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema
+        )
 
     def format_station_name_for_dropdown(self, station: WeatherStation) -> str:
         distance = self._get_distance_to_station(station)
@@ -112,6 +139,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return f"{station.name} ({station.canton})"
         else:
             return f"{station.name} ({station.canton}) - {distance / 1000:.0f} km away"
+
+    async def _get_weather_station_options(self):
+        stations = await self.hass.async_add_executor_job(self.load_station_list)
+        _LOGGER.debug("Stations received.", extra={"Stations": stations})
+        if (self.hass.config.latitude is not None and
+            self.hass.config.longitude is not None):
+                stations = sorted(stations, key=lambda it: self._get_distance_to_station(it))
+        return [SelectOptionDict(value=station.code,
+                                    label=self.format_station_name_for_dropdown(station))
+                                    for station in stations]
+
+    async def _get_pollen_station_options(self):
+        pollen_stations = await self.hass.async_add_executor_job(self.load_pollen_station_list)
+        if (self.hass.config.latitude is not None and
+            self.hass.config.longitude is not None):
+                stations = sorted(pollen_stations, key=lambda it: self._get_distance_to_station(it))
+        return [SelectOptionDict(value=station.code,
+                                    label=self.format_station_name_for_dropdown(station))
+                                    for station in stations]
 
     def _get_distance_to_station(self, station: WeatherStation):
         h_lat = self.hass.config.latitude
