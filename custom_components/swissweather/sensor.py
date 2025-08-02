@@ -26,7 +26,7 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,8 +39,14 @@ from . import (
     get_pollen_coordinator_key,
     get_weather_coordinator_key,
 )
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import CurrentWeather, Warning, WarningLevel, WarningType, WeatherForecast
+from .const import (
+    CONF_POLLEN_STATION_CODE,
+    CONF_POST_CODE,
+    CONF_STATION_CODE,
+    CONF_WEATHER_WARNINGS_NUMBER,
+    DOMAIN,
+)
+from .meteo import CurrentWeather, Warning, WarningLevel, WarningType
 from .pollen import CurrentPollen, PollenLevel
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,6 +108,13 @@ async def async_setup_entry(
     postCode: str = config_entry.data[CONF_POST_CODE]
     stationCode: str = config_entry.data.get(CONF_STATION_CODE)
     pollenStationCode: str = config_entry.data.get(CONF_POLLEN_STATION_CODE)
+    numberOfWeatherWarnings: int = config_entry.data.get(CONF_WEATHER_WARNINGS_NUMBER)
+    # Backwards compat
+    if numberOfWeatherWarnings is None:
+        numberOfWeatherWarnings = 1
+    else:
+        numberOfWeatherWarnings = int(numberOfWeatherWarnings)
+
     if stationCode is None:
         id_combo = f"{postCode}"
     else:
@@ -115,8 +128,9 @@ async def async_setup_entry(
         entities += [SwissPollenLevelSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS if sensorEntry.device_class is None]
 
     entities.append(SwissWeatherWarningsSensor(postCode, deviceInfo, coordinator))
-    entities.append(SwissWeatherSingleWarningSensor(postCode, 0, deviceInfo, coordinator))
-    entities.append(SwissWeatherSingleWarningLevelSensor(postCode, 0, deviceInfo, coordinator))
+    for i in range(0, numberOfWeatherWarnings):
+        entities.append(SwissWeatherSingleWarningSensor(postCode, i, deviceInfo, coordinator))
+        entities.append(SwissWeatherSingleWarningLevelSensor(postCode, i, deviceInfo, coordinator))
     async_add_entities(entities)
 
 
@@ -282,7 +296,7 @@ class SwissWeatherSingleWarningLevelSensor(CoordinatorEntity[SwissWeatherDataCoo
         else:
             key = f"warnings.{index}"
             name = f"Weather warning level {index + 1}"
-            attr_name  = f"Weather warning level {index + 1} at {post_code}"
+            attr_name  = f"Weather warning {index + 1} level at {post_code}"
 
         self.index = index
         self.entity_description = SensorEntityDescription(key=key,

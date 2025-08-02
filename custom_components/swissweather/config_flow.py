@@ -11,8 +11,11 @@ from swiss_pollen import Measurement, PollenService, Station
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.config_entries import SOURCE_RECONFIGURE, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -20,7 +23,7 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util.location import distance
 
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, CONF_WEATHER_WARNINGS_NUMBER, DOMAIN
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
 
@@ -73,6 +76,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             options=pollen_station_options,
                             mode=SelectSelectorMode.DROPDOWN
                         )
+                    ),
+                    vol.Required(CONF_WEATHER_WARNINGS_NUMBER, default=1): NumberSelector(
+                        NumberSelectorConfig(min=0, max=10, mode=NumberSelectorMode.BOX, step=1)
                     )
                 })
                 return self.async_show_form(
@@ -112,9 +118,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reconfigure_entry = self._get_reconfigure_entry()
         default_station_code = None
         default_pollen_station_code = None
+        default_weather_alerts = 1
         if reconfigure_entry is not None:
             default_station_code = reconfigure_entry.data.get(CONF_STATION_CODE)
             default_pollen_station_code = reconfigure_entry.data.get(CONF_POLLEN_STATION_CODE)
+            default_weather_alerts = reconfigure_entry.data.get(CONF_WEATHER_WARNINGS_NUMBER)
+            if default_weather_alerts is None:
+                default_weather_alerts = 1
+
         schema = vol.Schema({
             vol.Optional(CONF_STATION_CODE, default=default_station_code): SelectSelector(
                 SelectSelectorConfig(
@@ -127,6 +138,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     options=pollen_station_options,
                     mode=SelectSelectorMode.DROPDOWN
                 )
+            ),
+            vol.Required(CONF_WEATHER_WARNINGS_NUMBER, default=default_weather_alerts): NumberSelector(
+                NumberSelectorConfig(min=0, max=10, mode=NumberSelectorMode.BOX, step=1)
             )
         })
         return self.async_show_form(
