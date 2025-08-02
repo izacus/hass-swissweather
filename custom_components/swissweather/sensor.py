@@ -17,6 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONCENTRATION_PARTS_PER_CUBIC_METER,
     DEGREE,
+    MATCH_ALL,
     PERCENTAGE,
     UnitOfIrradiance,
     UnitOfPrecipitationDepth,
@@ -39,7 +40,7 @@ from . import (
     get_weather_coordinator_key,
 )
 from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import CurrentWeather
+from .meteo import CurrentWeather, Warning, WarningLevel, WarningType, WeatherForecast
 from .pollen import CurrentPollen, PollenLevel
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,6 +114,9 @@ async def async_setup_entry(
         entities += [SwissPollenSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS]
         entities += [SwissPollenLevelSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS if sensorEntry.device_class is None]
 
+    entities.append(SwissWeatherWarningsSensor(postCode, deviceInfo, coordinator))
+    entities.append(SwissWeatherSingleWarningSensor(postCode, 0, deviceInfo, coordinator))
+    entities.append(SwissWeatherSingleWarningLevelSensor(postCode, 0, deviceInfo, coordinator))
     async_add_entities(entities)
 
 
@@ -136,6 +140,193 @@ class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorE
             return None
         currentState = self.coordinator.data[0]
         return self._sensor_entry.data_function(currentState)
+
+def get_warning_enum_to_name(value):
+    if value is None:
+        return None
+    return value.name.replace('_', ' ').capitalize()
+
+def get_warnings_from_coordinator(coordinator_data) -> list[Warning] | None:
+    if coordinator_data is None or len(coordinator_data) < 2:
+        return None
+    return coordinator_data[1].warnings
+
+class SwissWeatherWarningsSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
+    """Shows count of current alterts and their content as attributes."""
+
+    def __init__(self, post_code:str, device_info: DeviceInfo, coordinator:SwissWeatherDataCoordinator) -> None:
+        super().__init__(coordinator)
+        self.entity_description = SensorEntityDescription(key="warnings",
+                                                          name="Weather Warnings")
+        self._attr_name = f"Weather warnings at {post_code}"
+        self._attr_unique_id = f"{post_code}.warnings"
+        self._attr_device_info = device_info
+        self._attr_attribution = "Source: MeteoSwiss"
+        self._attr_suggested_display_precision = 0
+        # We don't want recorder to record any attributes because that will explode the database.
+        self._entity_component_unrecorded_attributes = MATCH_ALL
+
+    @property
+    def native_value(self) -> StateType | Decimal:
+        if self.coordinator.data is None or len(self.coordinator.data) < 2:
+            return None
+
+        warnings = get_warnings_from_coordinator(self.coordinator.data)
+        if warnings is None:
+            return 0
+        return len(warnings)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, any] | None:
+        """Return additional state attributes."""
+        warnings = get_warnings_from_coordinator(self.coordinator.data)
+        if warnings is None:
+            return None
+
+        links = []
+        for warning in warnings:
+            for link in warning.links:
+                links.append(link[1])
+
+        return { 'warning_types': [get_warning_enum_to_name(warning.warningType) for warning in warnings],
+                 'warning_levels': [get_warning_enum_to_name(warning.warningLevel) for warning in warnings],
+                 'warning_levels_numeric': [warning.warningLevel for warning in warnings],
+                 'warning_valid_from': [warning.validFrom for warning in warnings],
+                 'warning_valid_to': [warning.validTo for warning in warnings],
+                 'warning_texts': [warning.text for warning in warnings],
+                 'warning_links': links }
+
+    @cached_property
+    def icon(self):
+        return "mdi:alert"
+
+class SwissWeatherSingleWarningSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
+    """Shows type and detail of a weather warning."""
+
+    index = 0
+
+    def __init__(self, post_code:str, index:int, device_info: DeviceInfo, coordinator:SwissWeatherDataCoordinator) -> None:
+        super().__init__(coordinator)
+        if index == 0:
+            key = "warnings.most_severe"
+            name = "Most severe weather warning"
+            attr_name = f"Most severe weather alert at {post_code}"
+        else:
+            key = f"warnings.{index}"
+            name = f"Weather warning {index + 1}"
+            attr_name  = f"Weather warning {index + 1} at {post_code}"
+
+        self.index = index
+        self.entity_description = SensorEntityDescription(key=key,
+                                                          name=name,
+                                                          device_class=SensorDeviceClass.ENUM)
+        self._attr_name = attr_name
+        self._attr_unique_id = f"{post_code}.warning.{index}"
+        self._attr_device_info = device_info
+        self._attr_attribution = "Source: MeteoSwiss"
+        self._attr_options = [get_warning_enum_to_name(warningType) for warningType in WarningType]
+        self._entity_component_unrecorded_attributes = MATCH_ALL
+
+    def _get_warning(self) -> Warning | None:
+        warnings = get_warnings_from_coordinator(self.coordinator.data)
+        if warnings is None:
+            return None
+        if len(warnings) < self.index + 1:
+            return None
+        return warnings[self.index]
+
+    @property
+    def native_value(self) -> StateType | Decimal:
+        warning = self._get_warning()
+        if warning is None:
+            return None
+        return get_warning_enum_to_name(warning.warningType)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, any] | None:
+        """Return additional state attributes."""
+        warning = self._get_warning()
+        if warning is None:
+            return None
+
+        return {
+            'level': get_warning_enum_to_name(warning.warningLevel),
+            'level_numeric': warning.warningLevel,
+            'text': warning.text,
+            'html_text': warning.htmlText,
+            'valid_from': warning.validFrom,
+            'valid_to': warning.validTo,
+            'links': warning.links,
+            'outlook': warning.outlook
+        }
+
+    @property
+    def available(self) -> bool:
+        warning = self._get_warning()
+        return warning is not None
+
+    @cached_property
+    def icon(self):
+        return "mdi:alert"
+
+class SwissWeatherSingleWarningLevelSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
+    """Shows severity of the weather warning."""
+    index = 0
+
+    def __init__(self, post_code:str, index:int, device_info: DeviceInfo, coordinator:SwissWeatherDataCoordinator) -> None:
+        super().__init__(coordinator)
+        if index == 0:
+            key = "warnings.most_severe.level"
+            name = "Most severe weather warning level"
+            attr_name = f"Most severe weather warning level at {post_code}"
+        else:
+            key = f"warnings.{index}"
+            name = f"Weather warning level {index + 1}"
+            attr_name  = f"Weather warning level {index + 1} at {post_code}"
+
+        self.index = index
+        self.entity_description = SensorEntityDescription(key=key,
+                                                          name=name,
+                                                          device_class=SensorDeviceClass.ENUM)
+        self._attr_name = attr_name
+        self._attr_unique_id = f"{post_code}.warning.level.{index}"
+        self._attr_device_info = device_info
+        self._attr_attribution = "Source: MeteoSwiss"
+        self._attr_options = [get_warning_enum_to_name(warningType) for warningType in WarningLevel]
+
+    def _get_warning(self) -> Warning | None:
+        warnings = get_warnings_from_coordinator(self.coordinator.data)
+        if warnings is None:
+            return None
+        if len(warnings) < self.index + 1:
+            return None
+        return warnings[self.index]
+
+    @property
+    def native_value(self) -> StateType | Decimal:
+        warning = self._get_warning()
+        if warning is None:
+            return None
+        return get_warning_enum_to_name(warning.warningLevel)
+
+    @property
+    def available(self) -> bool:
+        warning = self._get_warning()
+        return warning is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, any] | None:
+        """Return additional state attributes."""
+        warning = self._get_warning()
+        if warning is None:
+            return None
+        return {
+            'numeric': warning.warningLevel
+        }
+
+    @cached_property
+    def icon(self):
+        return "mdi:alert"
 
 class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEntity):
 

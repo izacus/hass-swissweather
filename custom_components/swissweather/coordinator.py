@@ -1,7 +1,7 @@
 """Coordinates updates for weather data."""
 
 import datetime
-from datetime import timedelta
+from datetime import UTC, timedelta
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -9,14 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
-from .meteo import (
-    CurrentWeather,
-    MeteoClient,
-    Warning,
-    WarningLevel,
-    WarningType,
-    WeatherForecast,
-)
+from .meteo import CurrentWeather, MeteoClient, Warning, WeatherForecast
 from .pollen import CurrentPollen, PollenClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,10 +51,24 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
                     current = current_forecast.current
                 if current is not None:
                     current_state = CurrentWeather(None, datetime.datetime.now(tz=datetime.UTC), current.currentTemperature, None, None, None, None, None, None, None, None, None, None, None)
+            if current_forecast is not None and current_forecast.warnings is not None:
+                # Remove all warnings that have expired and sort them via severity.
+                current_forecast.warnings = self._sort_filter_weather_alerts(current_forecast.warnings)
         except Exception as e:
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e
         return (current_state, current_forecast)
+
+    def _sort_filter_weather_alerts(self, warnings:list[Warning]) -> list[Warning]:
+        in_count = len(warnings)
+        now = datetime.datetime.now(UTC)
+        valid_warnings = [warning for warning in warnings
+                          if (warning.validFrom is None or warning.validFrom <= now) and
+                             (warning.validTo is None or warning.validTo >= now)]
+        valid_warnings = sorted(valid_warnings, key=lambda warning: warning.warningLevel, reverse=True)
+        _LOGGER.info("Weather warnings - in: %d filtered: %d", in_count, len(valid_warnings))
+        return valid_warnings
+
 
 class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
     """Coordinates loading of pollen data."""
