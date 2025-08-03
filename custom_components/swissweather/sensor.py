@@ -165,6 +165,16 @@ def get_warnings_from_coordinator(coordinator_data) -> list[Warning] | None:
         return None
     return coordinator_data[1].warnings
 
+def get_color_for_warning_level(level: WarningLevel) -> str:
+    """Returns icon color for the corresponding warning level."""
+    if level is None:
+        return "gray"
+    if level in (WarningLevel.NO_OR_MINIMAL_HAZARD, WarningLevel.NO_DANGER):
+        return "gray"
+    if level == WarningLevel.MODERATE_HAZARD:
+        return "amber"
+    return "red"
+
 class SwissWeatherWarningsSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorEntity):
     """Shows count of current alterts and their content as attributes."""
 
@@ -271,7 +281,8 @@ class SwissWeatherSingleWarningSensor(CoordinatorEntity[SwissWeatherDataCoordina
             'valid_from': warning.validFrom,
             'valid_to': warning.validTo,
             'links': warning.links,
-            'outlook': warning.outlook
+            'outlook': warning.outlook,
+            'icon_color': get_color_for_warning_level(warning.warningLevel)
         }
 
     @property
@@ -335,7 +346,8 @@ class SwissWeatherSingleWarningLevelSensor(CoordinatorEntity[SwissWeatherDataCoo
         if warning is None:
             return None
         return {
-            'numeric': warning.warningLevel
+            'numeric': warning.warningLevel,
+            'icon_color': get_color_for_warning_level(warning.warningLevel)
         }
 
     @cached_property
@@ -374,6 +386,17 @@ class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEnt
     def icon(self):
         return "mdi:flower-pollen"
 
+def get_color_for_pollen_level(level: int) -> str:
+    """Returns icon color for the corresponding warning level."""
+    if level is not None:
+        if level <= 10:
+            return "gray"
+        elif level <= 70:
+            return "amber"
+        elif level <= 250:
+            return "red"
+    return "gray"
+
 class SwissPollenLevelSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEntity):
 
     def __init__(self, post_code:str, station_code: str, device_info: DeviceInfo, sensor_entry:SwissPollenSensorEntry, coordinator:SwissPollenDataCoordinator) -> None:
@@ -387,6 +410,7 @@ class SwissPollenLevelSensor(CoordinatorEntity[SwissPollenDataCoordinator], Sens
         self._attr_device_info = device_info
         self._attr_options = [PollenLevel.NONE, PollenLevel.LOW, PollenLevel.MEDIUM, PollenLevel.STRONG, PollenLevel.VERY_STRONG]
         self._attr_attribution = "Source: MeteoSwiss"
+        self._entity_component_unrecorded_attributes = MATCH_ALL
 
     @property
     def native_value(self) -> StateType | Decimal:
@@ -406,6 +430,17 @@ class SwissPollenLevelSensor(CoordinatorEntity[SwissPollenDataCoordinator], Sens
             else:
                 return PollenLevel.VERY_STRONG
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, any] | None:
+        """Return additional state attributes."""
+        if self.coordinator.data is None:
+            return None
+        currentState = self.coordinator.data
+        value = self._sensor_entry.data_function(currentState)
+        return {
+            'icon_color': get_color_for_pollen_level(value)
+        }
 
     @cached_property
     def icon(self):
