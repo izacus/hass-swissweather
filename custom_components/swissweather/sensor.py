@@ -224,7 +224,7 @@ class SwissWeatherSingleWarningSensor(CoordinatorEntity[SwissWeatherDataCoordina
         if index == 0:
             key = "warnings.most_severe"
             name = "Most severe weather warning"
-            attr_name = f"Most severe weather alert at {post_code}"
+            attr_name = f"Most severe weather warning at {post_code}"
         else:
             key = f"warnings.{index}"
             name = f"Weather warning {index + 1}"
