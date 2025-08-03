@@ -54,4 +54,8 @@ multiline_secondary: true
 tap_action:
   action: more-info
   entity: sensor.most_severe_weather_alert_at_8000
+visibility:
+  - condition: state
+    entity: sensor.most_severe_weather_alert_at_8000
+    state_not: unavailable 
 ```
