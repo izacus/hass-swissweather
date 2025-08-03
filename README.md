@@ -24,11 +24,12 @@ It currently supports:
 
 ### Configure integration
 
-1. Add Swiss Weather integration to Home Assistant. You'll be asked for two pieces of information:
+Add Swiss Weather integration to Home Assistant. You'll be asked for a few pieces of information:
 
-* Post Code: The post code of your location, used for forecast - e.g. 8001 for Zurich.
-* Station code: The station code of weather station showing live data near you. Choose the closest station within reason - e.g. it probably doesn't make sense to select "Uetliberg" to get data in Zurich due to altitude difference. Choose Kloten on Fluntern instead.
-* Pollen station code: The station code of pollen measurement station for pollen data. 
+* **Post Code**: The post code of your location, used for forecast and weather alerts - e.g. 8001 for Zurich.
+* **Station code**: The station code of weather station measuring live data near you. Choose the closest station within reason - e.g. it probably doesn't make sense to select "Uetliberg" to get data in Zurich due to altitude difference. Choose Kloten on Fluntern instead. If not set, limited data will be pulled from the forecast.
+* **Pollen station code**: The station code of pollen measurement station for pollen data. Same rules apply as before.
+* **Number of weather warning entities**: This sets the number of separate entities created for weather warnings. By default is one - entities are created only for the most severe weather warning. You can increase this to create separate entities for 2nd most severe, 3rd, etc.
 
 ### Example Weather Alert mushroom card
 
