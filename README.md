@@ -41,13 +41,7 @@ icon: mdi:alert
 primary: " {{states('sensor.most_severe_weather_warning_at_8000') }} - {{states('sensor.most_severe_weather_warning_level_at_8000')}}"
 secondary: "{{state_attr('sensor.most_severe_weather_alert_at_8000', 'text')}}"
 icon_color: >
-  {% set warning_level=state_attr('sensor.most_severe_weather_warning_level_at_8000','numeric') |int %}   {% if warning_level > 2 %}
-          red
-  {% elif warning_level > 1 %}
-          amber
-  {% else %}
-          gray
-  {% endif %}
+  {{ state_attr('sensor.most_severe_weather_warning_level_at_8134','icon_color') }}
 badge_color: red
 badge_icon: |
   {% set number_of_warnings=states("sensor.weather_warnings_at_8000") |int %}
