@@ -29,3 +29,34 @@ It currently supports:
 * Post Code: The post code of your location, used for forecast - e.g. 8001 for Zurich.
 * Station code: The station code of weather station showing live data near you. Choose the closest station within reason - e.g. it probably doesn't make sense to select "Uetliberg" to get data in Zurich due to altitude difference. Choose Kloten on Fluntern instead.
 * Pollen station code: The station code of pollen measurement station for pollen data. 
+
+### Example Weather Alert mushroom card
+
+Data for weather alert needs to be pulled out of a card. Example mushroom template card which shows most severe weather alert and a badge for more:
+
+```
+type: custom:mushroom-template-card
+icon: mdi:alert
+primary: " {{states('sensor.most_severe_weather_warning_at_8000') }} - {{states('sensor.most_severe_weather_warning_level_at_8000')}}"
+secondary: "{{state_attr('sensor.most_severe_weather_alert_at_8000', 'text')}}"
+icon_color: >
+  {% set warning_level=state_attr('sensor.most_severe_weather_warning_level_at_8000','numeric') |int %}   {% if warning_level > 2 %}
+          red
+  {% elif warning_level > 1 %}
+          amber
+  {% else %}
+          gray
+  {% endif %}
+badge_color: red
+badge_icon: |
+  {% set number_of_warnings=states("sensor.weather_warnings_at_8000") |int %}
+  {% if number_of_warnings > 9 %}
+    mdi:numeric-9-plus
+  {% elif number_of_warnings > 1 and number_of_warnings < 10 %}
+    mdi:numeric-{{number_of_warnings}}
+  {% endif %}
+multiline_secondary: true
+tap_action:
+  action: more-info
+  entity: sensor.most_severe_weather_alert_at_8000
+```
