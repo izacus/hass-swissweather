@@ -4,7 +4,8 @@ This is an integration to download data from [MeteoSwiss](https://www.meteoschwe
 
 It currently supports:
   * Current weather state - temperature, precipitation, humidity, wind, etc. for a given autmated measurement station.
-  * Hourly and daily weather forecast based on a location encoded with post number.
+  * Hourly and daily weather forecast based on a location encoded with post nurmber.
+  * Weather warnings (e.g. floods, fires, earthquake dangers, etc.) for the set location.
   * Pollen measurement status across a set of automated stations.
 
 ## Installation
