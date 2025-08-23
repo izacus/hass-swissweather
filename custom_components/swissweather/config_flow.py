@@ -9,7 +9,6 @@ from typing import Any
 import requests
 import voluptuous as vol
 
-from config.custom_components.swissweather.pollen import PollenClient
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import (
@@ -30,6 +29,7 @@ from .const import (
     CONF_WEATHER_WARNINGS_NUMBER,
     DOMAIN,
 )
+from .pollen import PollenClient
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
 
