@@ -265,7 +265,7 @@ class MeteoClient:
             condition = ICON_TO_CONDITION_MAP.get(icon)
             temperatureMax = (to_float(dailyJson.get('temperatureMax', None)), "°C")
             temperatureMin = (to_float(dailyJson.get('temperatureMin', None)), "°C")
-            precipitation = (to_float(dailyJson.get('precipitation', None)), "mm")
+            precipitation = (to_float(dailyJson.get('precipitation', None)), "mm/h")
             forecast.append(Forecast(timestamp, icon, condition, temperatureMax, temperatureMin, precipitation, None))
         return forecast
 
@@ -279,15 +279,34 @@ class MeteoClient:
             return None
         startTimestamp = datetime.fromtimestamp(startTimestampEpoch / 1000, UTC)
 
-
         forecast = []
         temperatureMaxList = [ (value, "°C") for value in graphJson.get("temperatureMax1h", [])]
         temperatureMeanList = [ (value, "°C") for value in graphJson.get("temperatureMean1h", [])]
         temperatureMinList = [ (value, "°C") for value in graphJson.get("temperatureMin1h", [])]
-        precipitationList = [ (value, "mm") for value in graphJson.get("precipitation1h", [])]
         windGustSpeedList = [ (value, "km/h") for value in graphJson.get("gustSpeed1h", [])]
         windSpeedList = [ (value, "km/h") for value in graphJson.get("windSpeed1h", [])]
         sunshineList = [ (value, "min/h") for value in graphJson.get("sunshine1h", [])]
+
+        precipitationList = []
+        if graphJson.get("precipitation1h") is not None and graphJson.get("precipitation10m") is not None:
+            # Precipitation behaves a bit differently - the 1h values are offset after the 10m values(start vs. startLowResolution) so the
+            # 10min values need to be averaged to 1h and prepended to get the correct timestamp.
+            precipitation10mList = graphJson.get("precipitation10m", [])
+            precipitation1hList = graphJson.get("precipitation1h", [])
+            # We usually have one less value in the 10m list, so append the "next" value to get a full chunk for averaging.
+            precipitation10mList.append(precipitation1hList[0])
+            # Average 10m values in chunks of 6 to get hourly data.
+            precipitationList = [sum(precipitation10mList[i:i+6]) / 6.0 for i in range(0, len(precipitation10mList), 6)]
+            # Drop the values to make the list the same size as other hourlies.
+            lenDiff = len(temperatureMeanList) - len(precipitation1hList)
+            logger.debug("Need to leave %d 10min datapoints out of %d (%d pre merge)", lenDiff, len(precipitationList), len(precipitation10mList))
+            del precipitationList[lenDiff:]
+            logger.debug("List: %s", str(precipitationList))
+            # Now append hourly data
+            precipitationList += precipitation1hList
+            # And convert to right data type
+            precipitationList = [(value, "mm/h") for value in precipitationList]
+            logger.debug("Calculated precipitation - %d 10-mins, %d hourlies into %d total", len(precipitation10mList), len(precipitation1hList), len(precipitationList))
 
         # We get icons only once every 3 hours so we need to expand each elemen 3-times to match
         iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in graphJson.get("weatherIcon3h", [])))
