@@ -7,9 +7,9 @@ import logging
 from typing import Any
 
 import requests
-from swiss_pollen import Measurement, PollenService, Station
 import voluptuous as vol
 
+from config.custom_components.swissweather.pollen import PollenClient
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import (
@@ -23,7 +23,13 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util.location import distance
 
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, CONF_WEATHER_WARNINGS_NUMBER, DOMAIN
+from .const import (
+    CONF_POLLEN_STATION_CODE,
+    CONF_POST_CODE,
+    CONF_STATION_CODE,
+    CONF_WEATHER_WARNINGS_NUMBER,
+    DOMAIN,
+)
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
 
@@ -212,17 +218,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def load_pollen_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting pollen station list data...")
-        current_values: dict[Station, list[Measurement]] = PollenService.current_values()
-
+        pollen_client = PollenClient()
+        pollen_station_list = pollen_client.get_pollen_station_list()
+        if pollen_station_list is None:
+            return []
         stations = []
-        for station in current_values:
+        for station in pollen_station_list:
             _LOGGER.debug(station)
             stations.append(WeatherStation(
                 station.name,
-                station.code,
-                station.altitude,
-                station.latlong[0],
-                station.latlong[1],
+                station.abbreviation,
+                int(station.altitude),
+                station.lat,
+                station.lng,
                 station.canton
             ))
         return stations

@@ -164,6 +164,18 @@ class WeatherForecast:
     sunset: list[datetime] | None
     warnings: list[Warning] | None
 
+@dataclass
+class CurrentPollen(object):
+    stationAbbr: str
+    timestamp: datetime
+    birch: FloatValue
+    grasses: FloatValue
+    alder: FloatValue
+    hazel: FloatValue
+    beech: FloatValue
+    ash: FloatValue
+    oak: FloatValue
+
 class MeteoClient:
     language: str = "en"
 
