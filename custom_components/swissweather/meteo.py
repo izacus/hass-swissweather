@@ -16,19 +16,19 @@ FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
 CONDITION_CLASSES = {
-    "clear-night": [101],
+    "clear-night": [101,102],
     "cloudy": [5,35,105,135],
     "fog": [27,28,127,128],
     "hail": [],
-    "lightning": [12,112],
-    "lightning-rainy": [13,23,24,25,32,113,123,124,125,132],
-    "partlycloudy": [2,3,4,102,103,104],
+    "lightning": [12,40,41,112,140,141],
+    "lightning-rainy": [13,23,24,25,32,36,37,38,39,42,113,123,124,125,136,137,138,139,142],
+    "partlycloudy": [2,3,4,103,104],
     "pouring": [20,120],
-    "rainy": [6,9,14,17,29,33,106,109,114,117,129,133],
+    "rainy": [6,9,14,17,29,33,106,109,114,117,129,132,133],
     "snowy": [8,11,16,19,22,30,34,108,111,116,119,122,130,134],
     "snowy-rainy": [7,10,15,18,21,31,107,110,115,118,121,131],
-    "sunny": [1,26,126],
-    "windy": [],
+    "sunny": [1],
+    "windy": [26,126],
     "windy-variant": [],
     "exceptional": [],
 }
