@@ -107,8 +107,12 @@ class PollenClient:
                 if current is None:
                     logger.warning("No current data for %s in dataset for %s!", stationAbbrev, pollenKey)
                     continue
-                timestamp = datetime.fromtimestamp(current.get("date") / 1000, UTC)
-                value = float(current.get("value"))
+                timestamp_val = current.get("date")
+                if timestamp_val is not None:
+                    timestamp = datetime.fromtimestamp(timestamp_val / 1000, UTC)
+                else:
+                    timestamp = None
+                value = to_float(current.get("value"))
                 return (value, timestamp)
             logger.warning("Couldn't find %s in dataset for %s!", stationAbbrev, pollenKey)
             return (None, None)
