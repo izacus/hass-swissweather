@@ -38,11 +38,10 @@ Data for weather alert needs to be pulled out of a card. Example mushroom templa
 
 ```yaml
 type: custom:mushroom-template-card
-icon: mdi:alert
-primary: " {{states('sensor.most_severe_weather_warning_at_8000') }} - {{states('sensor.most_severe_weather_warning_level_at_8000')}}"
-secondary: "{{state_attr('sensor.most_severe_weather_warning_at_8000', 'text')}}"
-icon_color: >
-  {{ state_attr('sensor.most_severe_weather_warning_level_at_8000','icon_color') }}
+primary: "{{states('sensor.most_severe_weather_warning_at_8000') }} - {{states('sensor.most_severe_weather_warning_level_at_8000')}}"
+secondary: "{{state_attr('sensor.most_severe_weather_warning_at_8000', 'friendly_name')}}"
+features_position: bottom
+color: "{{ state_attr('sensor.most_severe_weather_warning_level_at_8000','icon_color')}}"
 badge_color: red
 badge_icon: |
   {% set number_of_warnings=states("sensor.weather_warnings_at_8000") |int %}
@@ -51,12 +50,13 @@ badge_icon: |
   {% elif number_of_warnings > 1 and number_of_warnings < 10 %}
     mdi:numeric-{{number_of_warnings}}
   {% endif %}
-multiline_secondary: true
-tap_action:
-  action: more-info
-  entity: sensor.most_severe_weather_warning_at_8000
+icon: mdi:alert
 visibility:
   - condition: state
     entity: sensor.most_severe_weather_warning_at_8000
-    state_not: unavailable 
+    state_not: unavailable
+tap_action:
+  action: more-info
+entity: sensor.most_severe_weather_warning_at_8000
+multiline_secondary: true
 ```
