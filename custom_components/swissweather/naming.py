@@ -19,6 +19,16 @@ def format_station_display_name(
     if not cleaned:
         return None
 
+    if "," in cleaned:
+        base_name, _, trailing = cleaned.partition(",")
+        canton_from_name = trailing.strip()
+        if canton_from_name:
+            return format_station_display_name(
+                base_name,
+                canton_from_name,
+                include_canton=True,
+            )
+
     if include_canton and canton:
         canton_clean = canton.strip()
         if canton_clean and not cleaned.casefold().endswith(canton_clean.casefold()):
