@@ -2,16 +2,45 @@
   "config": {
     "step": {
       "user": {
+        "title": "Forecast Place",
+        "description": "Search a forecast place by name, or enter an exact postal code or MeteoSwiss point ID. ZIP codes, locations and points of interest such as peaks, passes and huts are supported. You will confirm the selected forecast place in the next step.",
         "data": {
-          "stationCode": "Code of the weather station",
-          "postNumber": "Post number of your location"
+          "forecast_query": "Forecast place search"
+        }
+      },
+      "reconfigure": {
+        "title": "Forecast Place",
+        "description": "Search a forecast place by name, or enter an exact postal code or MeteoSwiss point ID. ZIP codes, locations and points of interest such as peaks, passes and huts are supported. You will confirm the selected forecast place in the next step.",
+        "data": {
+          "forecast_query": "Forecast place search"
+        }
+      },
+      "forecast_pick": {
+        "title": "Select Forecast Place",
+        "description": "Choose the forecast place you want to use, or select Search again.",
+        "data": {
+          "forecast_point": "Matching forecast places"
+        }
+      },
+      "details": {
+        "title": "Stations",
+        "description": "Review the forecast display name and choose the weather and pollen stations.",
+        "data": {
+          "forecastName": "Forecast display name",
+          "stationCode": "Weather station for current weather state",
+          "pollenStationCode": "Pollen measuring station",
+          "weatherWarningsNumber": "Number of weather warnings to show as separate entities (default: 1)"
         }
       }
     },
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "forecast_query_required": "Enter a forecast place search term.",
+      "forecast_query_too_short": "Enter at least 2 letters or an exact postal code / point ID.",
+      "forecast_query_not_found": "No matching forecast places were found.",
+      "invalid_forecast_point": "Select one of the matching forecast places."
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
