@@ -18,6 +18,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import SwissPollenDataCoordinator, SwissWeatherDataCoordinator
+from .forecast_points import find_forecast_point_by_id, load_forecast_point_list
 from .naming import build_entry_title, format_station_display_name
 from .station_lookup import (
     find_station_by_code,
@@ -78,7 +79,14 @@ async def _async_ensure_entry_names(hass: HomeAssistant, entry: ConfigEntry) -> 
     """Populate cached display names in older config entries and keep the title in sync."""
     data_updates = {}
 
-    forecast_name = entry.data.get(CONF_FORECAST_NAME) or str(entry.data.get(CONF_POST_CODE, "")).strip()
+    forecast_name = entry.data.get(CONF_FORECAST_NAME)
+    post_code = str(entry.data.get(CONF_POST_CODE, "")).strip()
+    if not forecast_name or forecast_name == post_code:
+        forecast_points = await hass.async_add_executor_job(load_forecast_point_list)
+        forecast_point = find_forecast_point_by_id(forecast_points, post_code)
+        forecast_name = (
+            forecast_point.display_name if forecast_point is not None else post_code
+        )
     if forecast_name and entry.data.get(CONF_FORECAST_NAME) != forecast_name:
         data_updates[CONF_FORECAST_NAME] = forecast_name
 
