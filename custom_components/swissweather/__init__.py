@@ -6,6 +6,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
     CONF_FORECAST_NAME,
@@ -57,6 +58,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(get_weather_coordinator_key(entry))
         hass.data[DOMAIN].pop(get_pollen_coordinator_key(entry))
     return unload_ok
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removing stale devices from the registry."""
+    if not any(identifier[0] == DOMAIN for identifier in device_entry.identifiers):
+        return False
+
+    entity_registry = er.async_get(hass)
+    device_entities = er.async_entries_for_device(
+        entity_registry, device_entry.id, include_disabled_entities=True
+    )
+    return len(device_entities) == 0
 
 
 async def _async_ensure_entry_names(hass: HomeAssistant, entry: ConfigEntry) -> ConfigEntry:
