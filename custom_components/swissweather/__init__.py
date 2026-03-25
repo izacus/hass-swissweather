@@ -18,7 +18,12 @@ from .const import (
 )
 from .coordinator import SwissPollenDataCoordinator, SwissWeatherDataCoordinator
 from .naming import build_entry_title, format_station_display_name
-from .station_lookup import find_station_by_code, load_pollen_station_list, load_weather_station_list
+from .station_lookup import (
+    find_station_by_code,
+    load_pollen_station_list,
+    load_weather_station_list,
+    split_place_and_canton,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,8 +71,9 @@ async def _async_ensure_entry_names(hass: HomeAssistant, entry: ConfigEntry) -> 
         weather_stations = await hass.async_add_executor_job(load_weather_station_list)
         station = find_station_by_code(weather_stations, entry.data.get(CONF_STATION_CODE))
         if station is not None:
+            station_name, station_canton = split_place_and_canton(station.name)
             data_updates[CONF_STATION_NAME] = format_station_display_name(
-                station.name, station.canton, include_canton=True
+                station_name, station_canton or station.canton, include_canton=True
             )
 
     if entry.data.get(CONF_POLLEN_STATION_CODE) and not entry.data.get(CONF_POLLEN_STATION_NAME):

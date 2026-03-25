@@ -35,6 +35,7 @@ from .station_lookup import (
     find_station_by_code,
     load_pollen_station_list,
     load_weather_station_list,
+    split_place_and_canton,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA_BACKUP = vol.Schema(
     {
         vol.Required(CONF_POST_CODE): str,
+        vol.Optional(CONF_FORECAST_NAME): str,
         vol.Optional(CONF_STATION_CODE): str,
         vol.Optional(CONF_POLLEN_STATION_CODE): str,
     }
@@ -64,6 +66,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Setup defaults if we're reconfiguring
                 schema = vol.Schema({
                     vol.Required(CONF_POST_CODE): str,
+                    vol.Optional(CONF_FORECAST_NAME): str,
                     vol.Optional(CONF_STATION_CODE): SelectSelector(
                         SelectSelectorConfig(
                             options=station_options,
@@ -123,8 +126,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reconfigure_entry = self._get_reconfigure_entry()
         default_station_code = None
         default_pollen_station_code = None
+        default_forecast_name = None
         default_weather_alerts = 1
         if reconfigure_entry is not None:
+            default_forecast_name = reconfigure_entry.data.get(CONF_FORECAST_NAME)
             default_station_code = reconfigure_entry.data.get(CONF_STATION_CODE)
             default_pollen_station_code = reconfigure_entry.data.get(CONF_POLLEN_STATION_CODE)
             default_weather_alerts = reconfigure_entry.data.get(CONF_WEATHER_WARNINGS_NUMBER)
@@ -132,6 +137,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default_weather_alerts = 1
 
         schema = vol.Schema({
+            vol.Optional(CONF_FORECAST_NAME, default=default_forecast_name): str,
             vol.Optional(CONF_STATION_CODE, default=default_station_code): SelectSelector(
                 SelectSelectorConfig(
                     options=station_options,
@@ -194,7 +200,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if reconfigure_entry is not None:
                 post_code = reconfigure_entry.data.get(CONF_POST_CODE)
         resolved_data[CONF_POST_CODE] = post_code
-        resolved_data[CONF_FORECAST_NAME] = str(post_code).strip()
+        forecast_name = user_input.get(CONF_FORECAST_NAME)
+        if forecast_name is None:
+            reconfigure_entry = self._get_reconfigure_entry()
+            if reconfigure_entry is not None:
+                forecast_name = reconfigure_entry.data.get(CONF_FORECAST_NAME)
+        forecast_name = str(forecast_name).strip() if forecast_name is not None else ""
+        resolved_data[CONF_FORECAST_NAME] = forecast_name or str(post_code).strip()
 
         weather_stations = await self.hass.async_add_executor_job(load_weather_station_list)
         pollen_stations = await self.hass.async_add_executor_job(load_pollen_station_list)
@@ -202,8 +214,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         station = find_station_by_code(weather_stations, user_input.get(CONF_STATION_CODE))
         pollen_station = find_station_by_code(pollen_stations, user_input.get(CONF_POLLEN_STATION_CODE))
 
+        station_name, station_canton = split_place_and_canton(station.name if station is not None else None)
         resolved_data[CONF_STATION_NAME] = (
-            format_station_display_name(station.name, station.canton, include_canton=True)
+            format_station_display_name(station_name, station_canton or (station.canton if station is not None else None), include_canton=True)
             if station is not None
             else None
         )
