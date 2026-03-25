@@ -94,3 +94,13 @@ def find_station_by_code(stations: list[WeatherStation], code: str | None) -> We
     if code is None:
         return None
     return next((station for station in stations if station.code == code), None)
+
+
+def split_place_and_canton(name: str | None) -> tuple[str | None, str | None]:
+    """Split values like 'Pfäffikon, ZH' into name and canton."""
+    if name is None:
+        return (None, None)
+    if "," not in name:
+        return (name, None)
+    place, canton = name.rsplit(",", 1)
+    return (place.strip(), canton.strip())
