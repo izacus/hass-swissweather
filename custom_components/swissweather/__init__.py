@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -16,6 +17,7 @@ from .const import (
     CONF_POST_CODE,
     CONF_STATION_CODE,
     CONF_STATION_NAME,
+    CONF_WEATHER_WARNINGS_NUMBER,
     DOMAIN,
 )
 from .coordinator import SwissPollenDataCoordinator, SwissWeatherDataCoordinator
@@ -31,6 +33,7 @@ from .station_lookup import (
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.WEATHER]
+_WARNING_INDEX_RE = re.compile(r"^(?P<post_code>.+)\.warning(?:\.level)?\.(?P<index>\d+)$")
 
 def get_weather_coordinator_key(entry: ConfigEntry):
     return entry.entry_id + "-weather-coordinator"
@@ -67,10 +70,31 @@ async def _async_cleanup_optional_devices(
     if entry.data.get(CONF_POLLEN_STATION_CODE) is None:
         await _async_remove_entry_device(hass, entry, "pollen-station")
 
+
+async def _async_cleanup_warning_entities(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    """Remove stale warning entities when the configured count decreases."""
+    entity_registry = er.async_get(hass)
+    configured_warning_count = int(
+        entry.data.get(CONF_WEATHER_WARNINGS_NUMBER, 1) or 0
+    )
+
+    for entity_entry in er.async_entries_for_config_entry(
+        entity_registry, entry.entry_id
+    ):
+        unique_id = entity_entry.unique_id or ""
+        match = _WARNING_INDEX_RE.match(unique_id)
+        if match is None:
+            continue
+        if int(match.group("index")) >= configured_warning_count:
+            entity_registry.async_remove(entity_entry.entity_id)
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Swiss Weather from a config entry."""
     entry = await _async_ensure_entry_names(hass, entry)
     await _async_cleanup_optional_devices(hass, entry)
+    await _async_cleanup_warning_entities(hass, entry)
 
     coordinator = SwissWeatherDataCoordinator(hass, entry)
     pollen_coordinator = SwissPollenDataCoordinator(hass, entry)
