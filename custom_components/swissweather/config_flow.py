@@ -79,12 +79,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the forecast search step during reconfigure."""
+        """Handle config entry reconfiguration."""
         if user_input is None:
-            return await self._show_forecast_search_form("reconfigure")
+            return await self._show_details_form("reconfigure")
 
         self._abort_if_unique_id_mismatch()
-        return await self._handle_forecast_search("reconfigure", user_input)
+        return await self.async_step_details(user_input)
 
     async def async_step_forecast_pick(
         self, user_input: dict[str, Any] | None = None
