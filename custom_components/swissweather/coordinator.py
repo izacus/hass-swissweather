@@ -96,7 +96,7 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
     async def _async_update_data(self) -> CurrentPollen | None:
         current_state = None
         if self._pollen_station_code is None:
-            _LOGGER.warning("Pollen code not set, not loading current state.")
+            _LOGGER.debug("Pollen code not set, not loading current state.")
         else:
             _LOGGER.info("Loading current pollen state for %s", self._pollen_station_code)
             try:
