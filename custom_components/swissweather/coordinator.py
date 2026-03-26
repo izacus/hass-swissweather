@@ -8,7 +8,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import (
+    CONF_FORECAST_POINT_TYPE,
+    CONF_POLLEN_STATION_CODE,
+    CONF_POST_CODE,
+    CONF_STATION_CODE,
+    DOMAIN,
+)
 from .meteo import CurrentWeather, MeteoClient, Warning, WeatherForecast
 from .pollen import CurrentPollen, PollenClient
 
@@ -22,6 +28,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
         self._post_code = config_entry.data[CONF_POST_CODE]
+        self._forecast_point_type = config_entry.data.get(CONF_FORECAST_POINT_TYPE)
         self._client = MeteoClient()
         update_interval = timedelta(minutes=10)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
@@ -43,7 +50,11 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
 
         try:
             _LOGGER.info("Loading current forecast for %s", self._post_code)
-            current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
+            current_forecast = await self.hass.async_add_executor_job(
+                self._client.get_forecast,
+                self._post_code,
+                self._forecast_point_type,
+            )
             _LOGGER.debug("Current forecast: %s", current_forecast)
             if current_state is None:
                 current = None

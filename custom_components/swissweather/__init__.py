@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
+    CONF_FORECAST_POINT_TYPE,
     CONF_FORECAST_NAME,
     CONF_POLLEN_STATION_CODE,
     CONF_POLLEN_STATION_NAME,
@@ -81,12 +82,20 @@ async def _async_ensure_entry_names(hass: HomeAssistant, entry: ConfigEntry) -> 
 
     forecast_name = entry.data.get(CONF_FORECAST_NAME)
     post_code = str(entry.data.get(CONF_POST_CODE, "")).strip()
+    forecast_point_type = entry.data.get(CONF_FORECAST_POINT_TYPE)
     if not forecast_name or forecast_name == post_code:
         forecast_points = await hass.async_add_executor_job(load_forecast_point_list)
         forecast_point = find_forecast_point_by_id(forecast_points, post_code)
         forecast_name = (
             forecast_point.display_name if forecast_point is not None else post_code
         )
+        if forecast_point is not None and forecast_point_type != forecast_point.point_type_id:
+            data_updates[CONF_FORECAST_POINT_TYPE] = forecast_point.point_type_id
+    elif forecast_point_type is None:
+        forecast_points = await hass.async_add_executor_job(load_forecast_point_list)
+        forecast_point = find_forecast_point_by_id(forecast_points, post_code)
+        if forecast_point is not None:
+            data_updates[CONF_FORECAST_POINT_TYPE] = forecast_point.point_type_id
     if forecast_name and entry.data.get(CONF_FORECAST_NAME) != forecast_name:
         data_updates[CONF_FORECAST_NAME] = forecast_name
 
