@@ -49,6 +49,7 @@ _LOGGER = logging.getLogger(__name__)
 CONF_FORECAST_QUERY = "forecast_query"
 CONF_FORECAST_POINT = "forecast_point"
 SEARCH_AGAIN_OPTION = "__search_again__"
+NO_POLLEN_STATION_OPTION = "__no_pollen_station__"
 MAX_FORECAST_POINT_RESULTS = 50
 
 
@@ -211,6 +212,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_pollen_station_code = (user_input or {}).get(
             CONF_POLLEN_STATION_CODE, existing_data.get(CONF_POLLEN_STATION_CODE)
         )
+        if default_pollen_station_code is None:
+            default_pollen_station_code = NO_POLLEN_STATION_OPTION
         default_weather_warnings = (user_input or {}).get(
             CONF_WEATHER_WARNINGS_NUMBER,
             existing_data.get(CONF_WEATHER_WARNINGS_NUMBER, 1),
@@ -312,8 +315,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 pollen_stations, key=lambda item: self._get_distance_to_station(item)
             )
         return [
+            SelectOptionDict(
+                value=NO_POLLEN_STATION_OPTION,
+                label="No pollen station",
+            ),
+            *[
             SelectOptionDict(value=station.code, label=self.format_station_name_for_dropdown(station))
             for station in pollen_stations
+            ],
         ]
 
     def _get_distance_to_station(self, station: WeatherStation) -> float | None:
@@ -349,12 +358,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         weather_stations = await self.hass.async_add_executor_job(load_weather_station_list)
         pollen_stations = await self.hass.async_add_executor_job(load_pollen_station_list)
 
+        station_code = user_input.get(CONF_STATION_CODE)
+        pollen_station_code = user_input.get(CONF_POLLEN_STATION_CODE)
+        if pollen_station_code == NO_POLLEN_STATION_OPTION:
+            pollen_station_code = None
+
+        resolved_data[CONF_STATION_CODE] = station_code
+        resolved_data[CONF_POLLEN_STATION_CODE] = pollen_station_code
+
         forecast_point = find_forecast_point_by_id(
             forecast_points, resolved_data.get(CONF_POST_CODE)
         )
-        station = find_station_by_code(weather_stations, user_input.get(CONF_STATION_CODE))
+        station = find_station_by_code(weather_stations, station_code)
         pollen_station = find_station_by_code(
-            pollen_stations, user_input.get(CONF_POLLEN_STATION_CODE)
+            pollen_stations, pollen_station_code
         )
 
         resolved_data[CONF_FORECAST_NAME] = (
