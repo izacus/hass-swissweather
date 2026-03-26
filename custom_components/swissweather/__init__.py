@@ -38,9 +38,39 @@ def get_weather_coordinator_key(entry: ConfigEntry):
 def get_pollen_coordinator_key(entry: ConfigEntry):
     return entry.entry_id + "-pollen-coordinator"
 
+
+async def _async_remove_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device_suffix: str
+) -> None:
+    """Remove an entry-owned device and all of its entities from the registries."""
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    device = device_registry.async_get_device(
+        identifiers={(DOMAIN, f"{entry.entry_id}-{device_suffix}")},
+        connections=set(),
+    )
+    if device is None:
+        return
+
+    for entity_entry in er.async_entries_for_device(
+        entity_registry, device.id, include_disabled_entities=True
+    ):
+        entity_registry.async_remove(entity_entry.entity_id)
+
+    device_registry.async_remove_device(device.id)
+
+
+async def _async_cleanup_optional_devices(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    """Remove optional devices that are no longer configured."""
+    if entry.data.get(CONF_POLLEN_STATION_CODE) is None:
+        await _async_remove_entry_device(hass, entry, "pollen-station")
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Swiss Weather from a config entry."""
     entry = await _async_ensure_entry_names(hass, entry)
+    await _async_cleanup_optional_devices(hass, entry)
 
     coordinator = SwissWeatherDataCoordinator(hass, entry)
     pollen_coordinator = SwissPollenDataCoordinator(hass, entry)
