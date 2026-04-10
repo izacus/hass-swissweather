@@ -63,8 +63,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
         in_count = len(warnings)
         now = datetime.datetime.now(UTC)
         valid_warnings = [warning for warning in warnings
-                          if (warning.validFrom is None or warning.validFrom <= now) and
-                             (warning.validTo is None or warning.validTo >= now)]
+                          if (warning.validTo is None or warning.validTo >= now)]
         valid_warnings = sorted(valid_warnings, key=lambda warning: warning.warningLevel, reverse=True)
         _LOGGER.info("Weather warnings - in: %d filtered: %d", in_count, len(valid_warnings))
         return valid_warnings
