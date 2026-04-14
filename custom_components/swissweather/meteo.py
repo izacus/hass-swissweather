@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/VQHA80.csv'
 
-FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz={:<06d}"
+FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
 CONDITION_CLASSES = {
