@@ -26,7 +26,7 @@ from .meteo import (
     Forecast as MeteoForecast,
     WeatherForecast,
 )
-from .naming import german_slug
+from .naming import slug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         )
         self._postCode = config_entry.data[CONF_POST_CODE]
         self._attr_name = None
-        self._attr_suggested_object_id = german_slug(forecast_name)
+        self._attr_suggested_object_id = slug(forecast_name)
         self._attr_attribution = "Source: MeteoSwiss"
 
     @property

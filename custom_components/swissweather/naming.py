@@ -36,29 +36,12 @@ def format_station_display_name(
     return cleaned
 
 
-def german_slug(value: str | None) -> str:
-    """Create a Home Assistant-friendly slug with German transliteration."""
+def slug(value: str | None) -> str:
+    """Create a Home Assistant-friendly slug."""
     if not value:
         return "unknown"
 
-    normalized = (
-        value.strip()
-        .replace("\u00c4", "Ae")
-        .replace("\u00d6", "Oe")
-        .replace("\u00dc", "Ue")
-        .replace("\u00e4", "ae")
-        .replace("\u00f6", "oe")
-        .replace("\u00fc", "ue")
-        .replace("\u00df", "ss")
-        .replace("\u00c3\u201e", "Ae")
-        .replace("\u00c3\u2013", "Oe")
-        .replace("\u00c3\u0153", "Ue")
-        .replace("\u00c3\u00a4", "ae")
-        .replace("\u00c3\u00b6", "oe")
-        .replace("\u00c3\u00bc", "ue")
-        .replace("\u00c3\u0178", "ss")
-    )
-    normalized = normalized.lower()
+    normalized = value.strip().lower()
     normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
     normalized = re.sub(r"_+", "_", normalized).strip("_")
     return normalized or "unknown"

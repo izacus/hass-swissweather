@@ -8,10 +8,8 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -31,9 +29,10 @@ from .const import (
     DOMAIN,
 )
 from .forecast_points import (
+    ForecastPointMetadataLoadError,
+    async_load_forecast_point_list,
     find_forecast_point_by_id,
     format_forecast_point_label,
-    load_forecast_point_list,
     search_forecast_points,
 )
 from .naming import build_entry_title, format_station_display_name
@@ -51,6 +50,7 @@ CONF_FORECAST_QUERY = "forecast_query"
 CONF_FORECAST_POINT = "forecast_point"
 SEARCH_AGAIN_OPTION = "__search_again__"
 NO_POLLEN_STATION_OPTION = "__no_pollen_station__"
+NO_WEATHER_STATION_OPTION = "__no_weather_station__"
 MAX_FORECAST_POINT_RESULTS = 50
 
 
@@ -66,6 +66,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._selected_forecast_point_type: str | None = None
         self._selected_forecast_name: str | None = None
         self._last_forecast_query: str = ""
+        self._forecast_points_cache: list[Any] | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -212,10 +213,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if reconfigure_entry is not None:
                 existing_data = dict(reconfigure_entry.data)
 
-        default_forecast_name = self._selected_forecast_name or existing_data.get(CONF_FORECAST_NAME, "")
         default_station_code = (user_input or {}).get(
             CONF_STATION_CODE, existing_data.get(CONF_STATION_CODE)
         )
+        if default_station_code is None:
+            default_station_code = NO_WEATHER_STATION_OPTION
         default_pollen_station_code = (user_input or {}).get(
             CONF_POLLEN_STATION_CODE, existing_data.get(CONF_POLLEN_STATION_CODE)
         )
@@ -228,7 +230,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Optional(CONF_FORECAST_NAME, default=default_forecast_name): str,
                 vol.Optional(CONF_STATION_CODE, default=default_station_code): SelectSelector(
                     SelectSelectorConfig(
                         options=station_options,
@@ -247,9 +248,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_WEATHER_WARNINGS_NUMBER,
                     default=default_weather_warnings,
-                ): NumberSelector(
-                    NumberSelectorConfig(min=0, max=10, mode=NumberSelectorMode.BOX, step=1)
-                ),
+                ): int,
             }
         )
         return self.async_show_form(step_id="details", data_schema=schema)
@@ -272,7 +271,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 origin_step, errors=errors, user_input=user_input
             )
 
-        forecast_points = await self.hass.async_add_executor_job(load_forecast_point_list)
+        try:
+            forecast_points = await self._async_get_forecast_points()
+        except ForecastPointMetadataLoadError:
+            return await self._show_forecast_search_form(
+                origin_step,
+                errors={CONF_FORECAST_QUERY: "forecast_query_metadata_unavailable"},
+                user_input=user_input,
+            )
+
         matches = search_forecast_points(forecast_points, query)
         if not matches:
             return await self._show_forecast_search_form(
@@ -314,8 +321,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self.hass.config.latitude is not None and self.hass.config.longitude is not None:
             stations = sorted(stations, key=lambda item: self._get_distance_to_station(item))
         return [
-            SelectOptionDict(value=station.code, label=self.format_station_name_for_dropdown(station))
-            for station in stations
+            SelectOptionDict(
+                value=NO_WEATHER_STATION_OPTION,
+                label="No weather station",
+            ),
+            *[
+                SelectOptionDict(value=station.code, label=self.format_station_name_for_dropdown(station))
+                for station in stations
+            ],
         ]
 
     async def _get_pollen_station_options(self) -> list[SelectOptionDict]:
@@ -331,8 +344,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 label="No pollen station",
             ),
             *[
-            SelectOptionDict(value=station.code, label=self.format_station_name_for_dropdown(station))
-            for station in pollen_stations
+                SelectOptionDict(value=station.code, label=self.format_station_name_for_dropdown(station))
+                for station in pollen_stations
             ],
         ]
 
@@ -343,6 +356,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if h_lat is None or h_lng is None:
             return None
         return distance(h_lat, h_lng, station.lat, station.lng)
+
+    async def _async_get_forecast_points(self) -> list[Any]:
+        """Load forecast-point metadata once per flow instance."""
+        if self._forecast_points_cache is None:
+            self._forecast_points_cache = await async_load_forecast_point_list(
+                async_get_clientsession(self.hass),
+                raise_on_error=True,
+            )
+        return self._forecast_points_cache
 
     async def _augment_entry_data(
         self,
@@ -358,21 +380,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 post_code = reconfigure_entry.data.get(CONF_POST_CODE)
         resolved_data[CONF_POST_CODE] = str(post_code).strip() if post_code is not None else None
 
-        forecast_name = user_input.get(CONF_FORECAST_NAME)
-        if forecast_name is None:
-            reconfigure_entry = self._get_reconfigure_entry()
-            if reconfigure_entry is not None:
-                forecast_name = reconfigure_entry.data.get(CONF_FORECAST_NAME)
-        forecast_name = str(forecast_name).strip() if forecast_name is not None else ""
-
-        forecast_points = await self.hass.async_add_executor_job(load_forecast_point_list)
+        forecast_points = await self._async_get_forecast_points()
         weather_stations = await self.hass.async_add_executor_job(load_weather_station_list)
         pollen_stations = await self.hass.async_add_executor_job(load_pollen_station_list)
         station_code = user_input.get(CONF_STATION_CODE)
         pollen_station_code = user_input.get(CONF_POLLEN_STATION_CODE)
 
-        station_code = user_input.get(CONF_STATION_CODE)
-        pollen_station_code = user_input.get(CONF_POLLEN_STATION_CODE)
+        if station_code == NO_WEATHER_STATION_OPTION:
+            station_code = None
         if pollen_station_code == NO_POLLEN_STATION_OPTION:
             pollen_station_code = None
 
@@ -394,8 +409,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         resolved_data[CONF_FORECAST_POINT_TYPE] = forecast_point_type
 
         resolved_data[CONF_FORECAST_NAME] = (
-            forecast_name
-            or (forecast_point.display_name if forecast_point is not None else "")
+            (forecast_point.display_name if forecast_point is not None else "")
             or self._selected_forecast_name
             or str(post_code).strip()
         )
@@ -420,3 +434,4 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         resolved_data.pop(CONF_FORECAST_QUERY, None)
         resolved_data.pop(CONF_FORECAST_POINT, None)
         return resolved_data
+

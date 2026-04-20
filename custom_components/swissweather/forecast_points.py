@@ -5,19 +5,25 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 import logging
+import unicodedata
 
-import requests
+from aiohttp import ClientError, ClientSession
 
 from .naming import format_station_display_name
+from .request import REQUEST_TIMEOUT, async_get_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 
 FORECAST_POINT_LIST_URL = (
     "https://data.geo.admin.ch/ch.meteoschweiz.ogd-local-forecasting/"
-    "ogd-local-forcasting_meta_point.csv"
+    "ogd-local-forecasting_meta_point.csv"
 )
 
 SUPPORTED_FORECAST_POINT_TYPES = {"2", "3"}
+
+
+class ForecastPointMetadataLoadError(Exception):
+    """Raised when forecast point metadata cannot be loaded reliably."""
 
 
 @dataclass
@@ -50,38 +56,100 @@ def _float_or_none(value: str | None) -> float | None:
     return float(value)
 
 
-def load_forecast_point_list(encoding: str = "latin-1") -> list[ForecastPoint]:
+def _search_aliases(value: str | None) -> set[str]:
+    """Build normalized aliases for robust place matching."""
+    if not value:
+        return set()
+
+    lowered = value.strip().casefold()
+    if not lowered:
+        return set()
+
+    aliases = {lowered}
+    german_normalized = (
+        lowered.replace("?", "ae")
+        .replace("?", "oe")
+        .replace("?", "ue")
+        .replace("?", "ss")
+    )
+    aliases.add(german_normalized)
+
+    ascii_aliases = set()
+    for alias in aliases:
+        normalized = unicodedata.normalize("NFKD", alias)
+        ascii_alias = "".join(
+            char for char in normalized if not unicodedata.combining(char)
+        )
+        ascii_aliases.add(ascii_alias)
+
+    aliases.update(ascii_aliases)
+    return {alias for alias in aliases if alias}
+
+
+async def async_load_forecast_point_list(
+    session: ClientSession,
+    encoding: str = "latin-1",
+    *,
+    raise_on_error: bool = False,
+) -> list[ForecastPoint]:
     """Load the list of MeteoSwiss local forecast points."""
     _LOGGER.info("Requesting forecast point list data...")
-    with requests.get(FORECAST_POINT_LIST_URL, stream=True) as response:
-        lines = (line.decode(encoding) for line in response.iter_lines())
-        reader = csv.DictReader(lines, delimiter=";")
-        points = []
-        for row in reader:
-            point_type_id = row.get("point_type_id")
-            point_id = row.get("point_id")
-            point_name = row.get("point_name")
-            if (
-                point_type_id not in SUPPORTED_FORECAST_POINT_TYPES
-                or not point_id
-                or not point_name
-            ):
-                continue
+    try:
+        async def _parse_csv(response) -> list[ForecastPoint]:
+            text = await response.text(encoding=encoding)
+            lines = text.splitlines()
+            reader = csv.DictReader(lines, delimiter=";")
+            points = []
+            for row in reader:
+                point_type_id = row.get("point_type_id")
+                point_id = row.get("point_id")
+                point_name = row.get("point_name")
+                if (
+                    point_type_id not in SUPPORTED_FORECAST_POINT_TYPES
+                    or not point_id
+                    or not point_name
+                ):
+                    continue
 
-            points.append(
-                ForecastPoint(
-                    point_id=point_id,
-                    point_type_id=point_type_id,
-                    postal_code=row.get("postal_code") or None,
-                    point_name=point_name,
-                    point_type_en=row.get("point_type_en") or None,
-                    point_height_masl=_int_or_none(row.get("point_height_masl")),
-                    lat=_float_or_none(row.get("point_coordinates_wgs84_lat")),
-                    lng=_float_or_none(row.get("point_coordinates_wgs84_lon")),
+                points.append(
+                    ForecastPoint(
+                        point_id=point_id,
+                        point_type_id=point_type_id,
+                        postal_code=row.get("postal_code") or None,
+                        point_name=point_name,
+                        point_type_en=row.get("point_type_en") or None,
+                        point_height_masl=_int_or_none(row.get("point_height_masl")),
+                        lat=_float_or_none(row.get("point_coordinates_wgs84_lat")),
+                        lng=_float_or_none(row.get("point_coordinates_wgs84_lon")),
+                    )
                 )
-            )
-        _LOGGER.info("Retrieved %d forecast points.", len(points))
-        return points
+            return points
+
+        points = await async_get_with_retry(
+            session,
+            FORECAST_POINT_LIST_URL,
+            logger=_LOGGER,
+            response_handler=_parse_csv,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except (
+        ClientError,
+        TimeoutError,
+        UnicodeDecodeError,
+        csv.Error,
+        ValueError,
+    ) as err:
+        _LOGGER.warning(
+            "Failed to load MeteoSwiss forecast point metadata", exc_info=True
+        )
+        if raise_on_error:
+            raise ForecastPointMetadataLoadError(
+                "Failed to load MeteoSwiss forecast point metadata"
+            ) from err
+        return []
+
+    _LOGGER.info("Retrieved %d forecast points.", len(points))
+    return points
 
 
 def find_forecast_point_by_id(
@@ -112,9 +180,15 @@ def search_forecast_points(
     if len(normalized) < 2:
         return []
 
-    lowered = normalized.casefold()
+    query_aliases = _search_aliases(normalized)
     matches = [
-        point for point in points if lowered in point.display_name.casefold()
+        point
+        for point in points
+        if any(
+            query_alias in point_alias
+            for query_alias in query_aliases
+            for point_alias in _search_aliases(point.display_name)
+        )
     ]
     return sorted(matches, key=lambda point: (point.display_name, point.point_type_id))
 

@@ -24,9 +24,8 @@
       },
       "details": {
         "title": "Stations",
-        "description": "Review the forecast display name and choose the weather and pollen stations.",
+        "description": "Choose the weather station, pollen station, and warning settings.",
         "data": {
-          "forecastName": "Forecast display name",
           "stationCode": "Weather station for current weather state",
           "pollenStationCode": "Pollen measuring station",
           "weatherWarningsNumber": "Number of weather warnings to show as separate entities (default: 1)"
@@ -43,7 +42,9 @@
       "invalid_forecast_point": "Select one of the matching forecast places."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   }
 }
+
