@@ -17,6 +17,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from . import SwissWeatherDataCoordinator, get_weather_coordinator_key
 from .const import CONF_FORECAST_NAME, CONF_POST_CODE, DOMAIN
@@ -26,7 +27,6 @@ from .meteo import (
     Forecast as MeteoForecast,
     WeatherForecast,
 )
-from .naming import slug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         )
         self._postCode = config_entry.data[CONF_POST_CODE]
         self._attr_name = None
-        self._attr_suggested_object_id = slug(forecast_name)
+        self._attr_suggested_object_id = slugify(forecast_name)
         self._attr_attribution = "Source: MeteoSwiss"
 
     @property

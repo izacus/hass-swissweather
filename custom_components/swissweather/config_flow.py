@@ -427,7 +427,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else None
         )
         resolved_data[CONF_POLLEN_STATION_NAME] = (
-            format_station_display_name(pollen_station.name)
+            format_station_display_name(
+                pollen_station.name,
+                pollen_station.canton,
+                include_canton=True,
+            )
             if pollen_station is not None
             else None
         )

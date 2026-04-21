@@ -288,7 +288,11 @@ async def _async_ensure_entry_names(hass: HomeAssistant, entry: ConfigEntry) -> 
         pollen_stations = await hass.async_add_executor_job(load_pollen_station_list)
         station = find_station_by_code(pollen_stations, entry.data.get(CONF_POLLEN_STATION_CODE))
         if station is not None:
-            data_updates[CONF_POLLEN_STATION_NAME] = format_station_display_name(station.name)
+            data_updates[CONF_POLLEN_STATION_NAME] = format_station_display_name(
+                station.name,
+                station.canton,
+                include_canton=True,
+            )
 
     merged_data = {**entry.data, **data_updates}
     new_title = build_entry_title(

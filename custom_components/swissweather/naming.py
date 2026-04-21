@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 
 def format_station_display_name(
     name: str | None,
@@ -34,17 +32,6 @@ def format_station_display_name(
         if canton_clean and not cleaned.casefold().endswith(canton_clean.casefold()):
             return f"{cleaned} {canton_clean}"
     return cleaned
-
-
-def slug(value: str | None) -> str:
-    """Create a Home Assistant-friendly slug."""
-    if not value:
-        return "unknown"
-
-    normalized = value.strip().lower()
-    normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
-    normalized = re.sub(r"_+", "_", normalized).strip("_")
-    return normalized or "unknown"
 
 
 def build_entry_title(
