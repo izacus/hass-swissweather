@@ -67,10 +67,10 @@ def _search_aliases(value: str | None) -> set[str]:
 
     aliases = {lowered}
     german_normalized = (
-        lowered.replace("?", "ae")
-        .replace("?", "oe")
-        .replace("?", "ue")
-        .replace("?", "ss")
+        lowered.replace("ä", "ae")
+        .replace("ö", "oe")
+        .replace("ü", "ue")
+        .replace("ß", "ss")
     )
     aliases.add(german_normalized)
 
