@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/VQHA80.csv'
 
-FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={:<06d}"
+FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
 CONDITION_CLASSES = {
@@ -217,8 +217,8 @@ class MeteoClient:
 
 
     ## Forecast
-    def get_forecast(self, postCode) -> WeatherForecast | None:
-        forecastJson = self._get_forecast_json(postCode, self.language)
+    def get_forecast(self, postCode, forecastPointType: str | None = None) -> WeatherForecast | None:
+        forecastJson = self._get_forecast_json(postCode, self.language, forecastPointType)
         logger.debug("Forecast JSON: %s", forecastJson)
         if forecastJson is None:
             return None
@@ -375,9 +375,22 @@ class MeteoClient:
             logger.error("Connection failure.", exc_info=True)
             return None
 
-    def _get_forecast_json(self, postCode, language):
+    def _build_forecast_query_value(
+        self, postCode, forecastPointType: str | None = None
+    ) -> str:
+        normalized = str(postCode).strip()
+        if forecastPointType == "2":
+            return normalized if len(normalized) != 4 else normalized.ljust(6, "0")
+        if forecastPointType == "3":
+            return normalized
+        if normalized.isdigit() and len(normalized) == 4:
+            return normalized.ljust(6, "0")
+        return normalized
+
+    def _get_forecast_json(self, postCode, language, forecastPointType: str | None = None):
         try:
-            url = FORECAST_URL.format(int(postCode))
+            query_value = self._build_forecast_query_value(postCode, forecastPointType)
+            url = FORECAST_URL.format(query_value)
             logger.debug("Requesting forecast data from %s...", url)
             return requests.get(url, headers =
                 { "User-Agent": FORECAST_USER_AGENT,
