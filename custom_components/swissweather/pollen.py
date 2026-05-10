@@ -21,6 +21,34 @@ class PollenLevel(StrEnum):
     STRONG = "Strong"
     VERY_STRONG = "Very Strong"
 
+# Plant-specific load thresholds (low, medium, strong) based on official MeteoSwiss classification:
+# https://www.meteoswiss.admin.ch/dam/jcr:43b4f361-8bc1-4af7-a232-c126de0f2f80/Belastungsklassen-der-allergenen-Pollenarten_E.pdf
+_POLLEN_THRESHOLDS: dict[str, tuple[int, int, int]] = {
+    "birch":   (10,  70, 300),
+    "grasses": (20,  50, 150),
+    "alder":   (10,  70, 250),
+    "hazel":   (10,  70, 250),
+    "beech":   (50, 130, 400),
+    "ash":     (10, 100, 350),
+    "oak":     (50, 130, 400),
+}
+_DEFAULT_POLLEN_THRESHOLDS = (10, 70, 250)
+
+def get_pollen_level(value: float | None, plant_key: str) -> PollenLevel | None:
+    """Return the pollen load level for a given value and plant type."""
+    if value is None:
+        return None
+    if value <= 0:
+        return PollenLevel.NONE
+    low, medium, strong = _POLLEN_THRESHOLDS.get(plant_key, _DEFAULT_POLLEN_THRESHOLDS)
+    if value <= low:
+        return PollenLevel.LOW
+    if value <= medium:
+        return PollenLevel.MEDIUM
+    if value <= strong:
+        return PollenLevel.STRONG
+    return PollenLevel.VERY_STRONG
+
 @dataclass
 class CurrentPollen:
     stationAbbr: str
