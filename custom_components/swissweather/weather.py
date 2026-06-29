@@ -95,7 +95,9 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     def native_temperature(self) -> float | None:
         state = self._current_state
         if state is not None:
-            return self.value_or_none(state.airTemperature)
+            temperature = self.value_or_none(state.airTemperature)
+            if temperature is not None:
+                return temperature
         forecast = self._current_forecast
         if forecast is not None and forecast.current is not None:
             return self.value_or_none(forecast.current.currentTemperature)
