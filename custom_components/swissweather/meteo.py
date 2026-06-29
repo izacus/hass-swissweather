@@ -244,7 +244,7 @@ class MeteoClient:
         if "currentWeather" not in forecastJson:
             return None
 
-        currentIcon = to_int(forecastJson.get('currentWeather', {}).get('icon', None))
+        currentIcon = to_int(forecastJson.get('currentWeather', {}).get('iconV2', None))
         currentCondition = None
         if currentIcon is not None:
             currentCondition = ICON_TO_CONDITION_MAP.get(currentIcon)
