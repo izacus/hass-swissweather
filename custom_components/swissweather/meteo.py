@@ -211,7 +211,7 @@ class MeteoClient:
             (to_float(csv_row.get('fu3010z0', None)), 'km/h'),
             (to_float(csv_row.get('fu3010z1', None)), 'km/h'),
             (to_float(csv_row.get('prestas0', None)), 'hPa'),
-            (to_float(csv_row.get('prestas0', None)), 'hPa'),
+            (to_float(csv_row.get('pp0qffs0', None)), 'hPa'),
             (to_float(csv_row.get('pp0qnhs0', None)), 'hPa'),
         )
 
