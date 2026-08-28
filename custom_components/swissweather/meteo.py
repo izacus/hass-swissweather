@@ -14,6 +14,7 @@ CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktu
 
 FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
+HTTP_TIMEOUT_SECONDS = 15
 
 CONDITION_CLASSES = {
     "clear-night": [101],
@@ -368,7 +369,8 @@ class MeteoClient:
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
             logger.debug("Requesting station data from %s...", url)
-            with requests.get(url, stream = True) as r:
+            with requests.get(url, stream=True, timeout=HTTP_TIMEOUT_SECONDS) as r:
+                r.raise_for_status()
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:
@@ -379,10 +381,17 @@ class MeteoClient:
         try:
             url = FORECAST_URL.format(int(postCode))
             logger.debug("Requesting forecast data from %s...", url)
-            return requests.get(url, headers =
-                { "User-Agent": FORECAST_USER_AGENT,
+            response = requests.get(
+                url,
+                headers={
+                    "User-Agent": FORECAST_USER_AGENT,
                     "Accept-Language": language,
-                    "Accept": "application/json" }).json()
-        except requests.exceptions.RequestException as e:
-            logger.error("Connection failure.", exc_info=1)
+                    "Accept": "application/json",
+                },
+                timeout=HTTP_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException:
+            logger.error("Connection failure.", exc_info=True)
             return None

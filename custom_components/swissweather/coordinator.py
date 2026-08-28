@@ -44,6 +44,10 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
         try:
             _LOGGER.info("Loading current forecast for %s", self._post_code)
             current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
+            if current_forecast is None:
+                raise UpdateFailed(
+                    f"No forecast data returned for {self._post_code}"
+                )
             _LOGGER.debug("Current forecast: %s", current_forecast)
             if current_state is None:
                 current = None
@@ -54,6 +58,8 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
             if current_forecast is not None and current_forecast.warnings is not None:
                 # Remove all warnings that have expired and sort them via severity.
                 current_forecast.warnings = self._sort_filter_weather_alerts(current_forecast.warnings)
+        except UpdateFailed:
+            raise
         except Exception as e:
             _LOGGER.exception(e)
             raise UpdateFailed(f"Update failed: {e}") from e
@@ -90,7 +96,13 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
             try:
                 current_state = await self.hass.async_add_executor_job(
                     self._client.get_current_pollen_for_station, self._pollen_station_code)
+                if current_state is None:
+                    raise UpdateFailed(
+                        f"No pollen data returned for {self._pollen_station_code}"
+                    )
                 _LOGGER.debug("Current pollen: %s", current_state)
+            except UpdateFailed:
+                raise
             except Exception as e:
                 _LOGGER.exception(e)
                 raise UpdateFailed(f"Update failed: {e}") from e

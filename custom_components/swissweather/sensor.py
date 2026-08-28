@@ -161,7 +161,11 @@ def get_warning_enum_to_name(value):
     return value.name.replace('_', ' ').capitalize()
 
 def get_warnings_from_coordinator(coordinator_data) -> list[Warning] | None:
-    if coordinator_data is None or len(coordinator_data) < 2:
+    if (
+        coordinator_data is None
+        or len(coordinator_data) < 2
+        or coordinator_data[1] is None
+    ):
         return None
     return coordinator_data[1].warnings
 
