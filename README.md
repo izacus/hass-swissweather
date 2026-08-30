@@ -38,10 +38,11 @@ Data for weather alert needs to be pulled out of a card. Example mushroom templa
 
 ```yaml
 type: custom:mushroom-template-card
+entity: sensor.most_severe_weather_warning_at_8000
 icon: mdi:alert
 primary: " {{states('sensor.most_severe_weather_warning_at_8000') }} - {{states('sensor.most_severe_weather_warning_level_at_8000')}}"
 secondary: "{{state_attr('sensor.most_severe_weather_warning_at_8000', 'text')}}"
-icon_color: >
+color: >
   {{ state_attr('sensor.most_severe_weather_warning_level_at_8000','icon_color') }}
 badge_color: red
 badge_icon: |
@@ -54,7 +55,6 @@ badge_icon: |
 multiline_secondary: true
 tap_action:
   action: more-info
-  entity: sensor.most_severe_weather_warning_at_8000
 visibility:
   - condition: state
     entity: sensor.most_severe_weather_warning_at_8000
