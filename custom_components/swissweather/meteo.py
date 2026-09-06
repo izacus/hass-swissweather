@@ -257,6 +257,14 @@ class MeteoClient:
         if currentIcon is not None:
             currentCondition = ICON_TO_CONDITION_MAP.get(currentIcon)
 
+        if currentCondition is None:
+            legacyIcon = to_int(currentWeather.get('icon', None))
+            if legacyIcon is not None and legacyIcon != MISSING_VALUE_SENTINEL:
+                legacyCondition = ICON_TO_CONDITION_MAP.get(legacyIcon)
+                if legacyCondition is not None:
+                    currentIcon = legacyIcon
+                    currentCondition = legacyCondition
+
         currentTemperature = to_float(currentWeather.get('temperature'))
         if currentTemperature == MISSING_VALUE_SENTINEL:
             currentTemperature = None
