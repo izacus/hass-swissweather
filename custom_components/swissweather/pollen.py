@@ -6,12 +6,19 @@ import logging
 
 import requests
 
-from .meteo import FORECAST_USER_AGENT, REQUEST_TIMEOUT, FloatValue, StationInfo
+from .meteo import (
+    DEFAULT_LANGUAGE,
+    FORECAST_USER_AGENT,
+    REQUEST_TIMEOUT,
+    FloatValue,
+    StationInfo,
+    to_meteoswiss_language,
+)
 
 logger = logging.getLogger(__name__)
 
 POLLEN_STATIONS_URL = 'https://data.geo.admin.ch/ch.meteoschweiz.ogd-pollen/ogd-pollen_meta_stations.csv'
-POLLEN_DATA_URL = 'https://www.meteoschweiz.admin.ch/product/output/measured-values/stationsTable/messwerte-pollen-{}-1h/stationsTable.messwerte-pollen-{}-1h.en.json'
+POLLEN_DATA_URL = 'https://www.meteoschweiz.admin.ch/product/output/measured-values/stationsTable/messwerte-pollen-{key}-1h/stationsTable.messwerte-pollen-{key}-1h.{language}.json'
 
 class PollenLevel(StrEnum):
     """ Marks pollen level """
@@ -45,6 +52,17 @@ def to_float(string: str) -> float | None:
 class PollenClient:
     """Returns values for pollen."""
 
+    language: str = DEFAULT_LANGUAGE
+
+    """
+    Initializes the client.
+
+    Languages available are en, de, fr and it. Any other tag (including full
+    Home Assistant tags such as "de-CH") is normalized to one of those.
+    """
+    def __init__(self, language=DEFAULT_LANGUAGE):
+        self.language = to_meteoswiss_language(language)
+
     def get_pollen_station_list(self) -> list[StationInfo] | None:
         station_list = self._get_csv_dictionary_for_url(POLLEN_STATIONS_URL, encoding='latin-1')
         logger.debug("Loading %s", POLLEN_STATIONS_URL)
@@ -54,7 +72,7 @@ class PollenClient:
         for row in station_list:
             stations.append(StationInfo(row.get('station_name'),
                                   row.get('station_abbr'),
-                                  row.get('station_type_en'),
+                                  row.get(f'station_type_{self.language}'),
                                   to_float(row.get('station_height_masl')),
                                   to_float(row.get('station_coordinates_wgs84_lat')),
                                   to_float(row.get('station_coordinates_wgs84_lon')),
@@ -91,7 +109,7 @@ class PollenClient:
         )
 
     def get_current_pollen_for_station_type(self, stationAbbrev: str, pollenKey: str) -> (float|None, datetime|None):
-        url = POLLEN_DATA_URL.format(pollenKey, pollenKey)
+        url = POLLEN_DATA_URL.format(key=pollenKey, language=self.language)
         logger.debug("Loading %s", url)
         try:
             pollenJson = requests.get(url, headers =

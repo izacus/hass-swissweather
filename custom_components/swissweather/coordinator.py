@@ -22,7 +22,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
         self._post_code = config_entry.data[CONF_POST_CODE]
-        self._client = MeteoClient()
+        self._client = MeteoClient(hass.config.language)
         update_interval = timedelta(minutes=10)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
                          always_update=False)
@@ -76,7 +76,7 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._pollen_station_code = config_entry.data.get(CONF_POLLEN_STATION_CODE)
-        self._client = PollenClient()
+        self._client = PollenClient(hass.config.language)
         update_interval = timedelta(minutes=60)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
             always_update=False)

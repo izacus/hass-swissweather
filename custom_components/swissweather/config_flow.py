@@ -219,7 +219,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def load_pollen_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting pollen station list data...")
-        pollen_client = PollenClient()
+        pollen_client = PollenClient(self.hass.config.language)
         pollen_station_list = pollen_client.get_pollen_station_list()
         if pollen_station_list is None:
             return []
