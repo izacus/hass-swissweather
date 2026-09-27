@@ -81,6 +81,7 @@ class PollenClient:
     """Returns values for pollen."""
 
     language: str = DEFAULT_LANGUAGE
+    _session: requests.Session
 
     """
     Initializes the client.
@@ -90,6 +91,8 @@ class PollenClient:
     """
     def __init__(self, language=DEFAULT_LANGUAGE):
         self.language = to_meteoswiss_language(language)
+        self._session = requests.Session()
+        self._session.headers.update({"User-Agent": FORECAST_USER_AGENT})
 
     def get_pollen_station_list(self) -> list[StationInfo] | None:
         station_list = self._get_csv_dictionary_for_url(POLLEN_STATIONS_URL, encoding='latin-1')
@@ -140,10 +143,13 @@ class PollenClient:
         url = POLLEN_DATA_URL.format(key=pollenKey, language=self.language)
         logger.debug("Loading %s", url)
         try:
-            pollenJson = requests.get(url, headers =
-                                        { "User-Agent": FORECAST_USER_AGENT,
-                                        "Accept": "application/json" },
-                                        timeout = REQUEST_TIMEOUT).json()
+            response = self._session.get(
+                url,
+                headers={"Accept": "application/json"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            pollenJson = response.json()
             stations = pollenJson.get("stations")
             if stations is None:
                 return (None, None)
@@ -170,7 +176,8 @@ class PollenClient:
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
             logger.debug("Requesting station data from %s...", url)
-            with requests.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
+            with self._session.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
+                r.raise_for_status()
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:
