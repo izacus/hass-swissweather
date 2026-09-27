@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 import requests
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import (

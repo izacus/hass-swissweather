@@ -1,8 +1,8 @@
 """Coordinates updates for weather data."""
 
 import datetime
-from datetime import UTC, timedelta
 import logging
+from datetime import UTC, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
