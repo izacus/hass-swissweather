@@ -15,6 +15,10 @@ CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktu
 FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
+# Connect and read timeout in seconds for every outgoing request. Without this
+# a stalled connection keeps a Home Assistant executor thread busy forever.
+REQUEST_TIMEOUT = (10, 15)
+
 CONDITION_CLASSES = {
     "clear-night": [101],
     "cloudy": [5,35,105,126,135],
@@ -389,7 +393,7 @@ class MeteoClient:
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
             logger.debug("Requesting station data from %s...", url)
-            with requests.get(url, stream = True) as r:
+            with requests.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:
@@ -403,7 +407,8 @@ class MeteoClient:
             return requests.get(url, headers =
                 { "User-Agent": FORECAST_USER_AGENT,
                     "Accept-Language": language,
-                    "Accept": "application/json" }).json()
+                    "Accept": "application/json" },
+                timeout = REQUEST_TIMEOUT).json()
         except requests.exceptions.RequestException as e:
             logger.error("Connection failure.", exc_info=1)
             return None

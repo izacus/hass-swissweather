@@ -6,7 +6,7 @@ import logging
 
 import requests
 
-from .meteo import FORECAST_USER_AGENT, FloatValue, StationInfo
+from .meteo import FORECAST_USER_AGENT, REQUEST_TIMEOUT, FloatValue, StationInfo
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,8 @@ class PollenClient:
         try:
             pollenJson = requests.get(url, headers =
                                         { "User-Agent": FORECAST_USER_AGENT,
-                                        "Accept": "application/json" }).json()
+                                        "Accept": "application/json" },
+                                        timeout = REQUEST_TIMEOUT).json()
             stations = pollenJson.get("stations")
             if stations is None:
                 return (None, None)
@@ -123,7 +124,7 @@ class PollenClient:
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
             logger.debug("Requesting station data from %s...", url)
-            with requests.get(url, stream = True) as r:
+            with requests.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:

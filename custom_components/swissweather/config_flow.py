@@ -29,6 +29,7 @@ from .const import (
     CONF_WEATHER_WARNINGS_NUMBER,
     DOMAIN,
 )
+from .meteo import REQUEST_TIMEOUT
 from .pollen import PollenClient
 
 STATION_LIST_URL = "https://data.geo.admin.ch/ch.meteoschweiz.messnetz-automatisch/ch.meteoschweiz.messnetz-automatisch_en.csv"
@@ -188,7 +189,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def load_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting station list data...")
-        with requests.get(STATION_LIST_URL, stream = True) as r:
+        with requests.get(STATION_LIST_URL, stream = True, timeout = REQUEST_TIMEOUT) as r:
             lines = (line.decode(encoding) for line in r.iter_lines())
             reader = csv.DictReader(lines, delimiter=';')
             stations = []
