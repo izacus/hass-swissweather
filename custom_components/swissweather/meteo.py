@@ -392,8 +392,13 @@ class MeteoClient:
                 if validToEpoch is not None:
                     validTo = datetime.fromtimestamp(validToEpoch / 1000, UTC)
 
+                try:
+                    type = WarningType(warningType)
+                except ValueError:
+                    type = WarningType.UNKNOWN
+
                 warning = Warning(
-                    WarningType(warningType),
+                    type,
                     WarningLevel(warningLevel),
                     warningJson.get("text"),
                     warningJson.get("htmlText"),

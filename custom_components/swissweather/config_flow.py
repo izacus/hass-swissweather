@@ -172,6 +172,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _get_pollen_station_options(self):
         pollen_stations = await self.hass.async_add_executor_job(self.load_pollen_station_list)
+        stations = pollen_stations
         if (self.hass.config.latitude is not None and
             self.hass.config.longitude is not None):
                 stations = sorted(pollen_stations, key=lambda it: self._get_distance_to_station(it))
@@ -179,12 +180,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     label=self.format_station_name_for_dropdown(station))
                                     for station in stations]
 
-    def _get_distance_to_station(self, station: WeatherStation):
+    def _get_distance_to_station(self, station: WeatherStation) -> float:
+        INVALID_VALUE = 999000 # 1000km is larger than CH
         h_lat = self.hass.config.latitude
         h_lng = self.hass.config.longitude
         if h_lat is None or h_lng is None:
-            return None
-        return distance(h_lat, h_lng, station.lat, station.lng)
+            return INVALID_VALUE
+        d = distance(h_lat, h_lng, station.lat, station.lng)
+        if d is None:
+            return INVALID_VALUE
+        return d
 
     def load_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting station list data...")

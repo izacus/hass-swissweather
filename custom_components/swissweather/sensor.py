@@ -148,10 +148,12 @@ class SwissWeatherSensor(CoordinatorEntity[SwissWeatherDataCoordinator], SensorE
         self._attr_attribution = "Source: MeteoSwiss"
 
     @property
-    def native_value(self) -> StateType | Decimal:
+    def native_value(self) -> StateType | Decimal: # type: ignore
         if self.coordinator.data is None:
             return None
         currentState = self.coordinator.data[0]
+        if currentState is None:
+            return None
         return self._sensor_entry.data_function(currentState)
 
 def get_warning_enum_to_name(value):
@@ -161,6 +163,8 @@ def get_warning_enum_to_name(value):
 
 def get_warnings_from_coordinator(coordinator_data) -> list[Warning] | None:
     if coordinator_data is None or len(coordinator_data) < 2:
+        return None
+    if coordinator_data[1] is None:
         return None
     return coordinator_data[1].warnings
 
