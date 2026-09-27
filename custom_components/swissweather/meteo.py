@@ -37,6 +37,10 @@ def to_meteoswiss_language(language: str | None) -> str:
                  language, DEFAULT_LANGUAGE)
     return DEFAULT_LANGUAGE
 
+# Connect and read timeout in seconds for every outgoing request. Without this
+# a stalled connection keeps a Home Assistant executor thread busy forever.
+REQUEST_TIMEOUT = (10, 15)
+
 CONDITION_CLASSES = {
     "clear-night": [101],
     "cloudy": [5,35,105,126,135],
@@ -56,6 +60,10 @@ CONDITION_CLASSES = {
 }
 
 ICON_TO_CONDITION_MAP : dict[int, str] =  {i: k for k, v in CONDITION_CLASSES.items() for i in v}
+
+# MeteoSwiss uses 32767 (Int16 max) as a "no data" sentinel in the plzDetail currentWeather block.
+MISSING_VALUE_SENTINEL = 32767
+
 
 """
 Returns float or None
@@ -234,7 +242,7 @@ class MeteoClient:
             (to_float(csv_row.get('fu3010z0', None)), 'km/h'),
             (to_float(csv_row.get('fu3010z1', None)), 'km/h'),
             (to_float(csv_row.get('prestas0', None)), 'hPa'),
-            (to_float(csv_row.get('prestas0', None)), 'hPa'),
+            (to_float(csv_row.get('pp0qffs0', None)), 'hPa'),
             (to_float(csv_row.get('pp0qnhs0', None)), 'hPa'),
         )
 
@@ -267,12 +275,29 @@ class MeteoClient:
         if "currentWeather" not in forecastJson:
             return None
 
-        currentIcon = to_int(forecastJson.get('currentWeather', {}).get('icon', None))
+        currentWeather = forecastJson.get('currentWeather', {})
+
+        currentIcon = to_int(currentWeather.get('iconV2', None))
+        if currentIcon == MISSING_VALUE_SENTINEL:
+            currentIcon = None
         currentCondition = None
         if currentIcon is not None:
             currentCondition = ICON_TO_CONDITION_MAP.get(currentIcon)
+
+        if currentCondition is None:
+            legacyIcon = to_int(currentWeather.get('icon', None))
+            if legacyIcon is not None and legacyIcon != MISSING_VALUE_SENTINEL:
+                legacyCondition = ICON_TO_CONDITION_MAP.get(legacyIcon)
+                if legacyCondition is not None:
+                    currentIcon = legacyIcon
+                    currentCondition = legacyCondition
+
+        currentTemperature = to_float(currentWeather.get('temperature'))
+        if currentTemperature == MISSING_VALUE_SENTINEL:
+            currentTemperature = None
+
         return CurrentState(
-            (to_float(forecastJson.get('currentWeather', {}).get('temperature')), "°C"),
+            (currentTemperature, "°C"),
             currentIcon, currentCondition)
 
     def _get_daily_forecast(self, forecastJson) -> list[Forecast] | None:
@@ -391,7 +416,7 @@ class MeteoClient:
     def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
         try:
             logger.debug("Requesting station data from %s...", url)
-            with requests.get(url, stream = True) as r:
+            with requests.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:
@@ -405,7 +430,8 @@ class MeteoClient:
             return requests.get(url, headers =
                 { "User-Agent": FORECAST_USER_AGENT,
                     "Accept-Language": language,
-                    "Accept": "application/json" }).json()
+                    "Accept": "application/json" },
+                timeout = REQUEST_TIMEOUT).json()
         except requests.exceptions.RequestException as e:
             logger.error("Connection failure.", exc_info=1)
             return None

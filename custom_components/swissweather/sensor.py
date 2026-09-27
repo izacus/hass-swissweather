@@ -15,7 +15,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONCENTRATION_PARTS_PER_CUBIC_METER,
     DEGREE,
     MATCH_ALL,
     PERCENTAGE,
@@ -359,7 +358,7 @@ class SwissPollenSensor(CoordinatorEntity[SwissPollenDataCoordinator], SensorEnt
     def __init__(self, post_code:str, station_code: str, device_info: DeviceInfo, sensor_entry:SwissPollenSensorEntry, coordinator:SwissPollenDataCoordinator) -> None:
         super().__init__(coordinator)
         state_class = SensorStateClass.MEASUREMENT
-        unit = CONCENTRATION_PARTS_PER_CUBIC_METER
+        unit = "p/m³"
         if sensor_entry.device_class is SensorDeviceClass.TIMESTAMP:
             state_class = None
             unit = None
