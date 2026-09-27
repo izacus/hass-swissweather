@@ -308,7 +308,7 @@ class SwissWeatherSingleWarningLevelSensor(CoordinatorEntity[SwissWeatherDataCoo
             name = "Most severe weather warning level"
             attr_name = f"Most severe weather warning level at {post_code}"
         else:
-            key = f"warnings.{index}"
+            key = f"warnings.{index}.level"
             name = f"Weather warning level {index + 1}"
             attr_name  = f"Weather warning {index + 1} level at {post_code}"
 
