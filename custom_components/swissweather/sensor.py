@@ -121,8 +121,8 @@ async def async_setup_entry(
     deviceInfo = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
     entities: list[SwissWeatherSensor|SwissPollenSensor] = [SwissWeatherSensor(postCode, deviceInfo, sensorEntry, coordinator) for sensorEntry in SENSORS]
 
-    if pollenStationCode is not None:
-        pollenCoordinator = hass.data[DOMAIN][get_pollen_coordinator_key(config_entry)]
+    pollenCoordinator = hass.data[DOMAIN].get(get_pollen_coordinator_key(config_entry))
+    if pollenStationCode and pollenCoordinator is not None:
         entities += [SwissPollenSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS]
         entities += [SwissPollenLevelSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS if sensorEntry.device_class is None]
 
