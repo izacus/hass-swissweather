@@ -102,6 +102,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         station_code = user_input.get(CONF_STATION_CODE) or "No Station"
         post_code = user_input.get(CONF_POST_CODE)
         pollen_station_code = user_input.get(CONF_POLLEN_STATION_CODE)
+        self._async_abort_entries_match({CONF_POST_CODE: post_code})
         return self.async_create_entry(title=f"Weather at {post_code} / {station_code or "No weather station"} / {pollen_station_code or "No pollen station"}", data=user_input,
             description=f"{user_input[CONF_POST_CODE]}")
 
