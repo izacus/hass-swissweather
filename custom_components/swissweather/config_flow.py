@@ -6,10 +6,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-import requests
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -161,8 +161,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             return f"{station.name} ({station.canton}) - {distance / 1000:.0f} km away"
 
-    async def _get_weather_station_options(self):
-        stations = await self.hass.async_add_executor_job(self.load_station_list)
+    async def _get_weather_station_options(self) -> list[SelectOptionDict]:
+        stations = await self.async_load_station_list()
         _LOGGER.debug("Stations received.", extra={"Stations": stations})
         if (self.hass.config.latitude is not None and
             self.hass.config.longitude is not None):
@@ -171,8 +171,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     label=self.format_station_name_for_dropdown(station))
                                     for station in stations]
 
-    async def _get_pollen_station_options(self):
-        pollen_stations = await self.hass.async_add_executor_job(self.load_pollen_station_list)
+    async def _get_pollen_station_options(self) -> list[SelectOptionDict]:
+        pollen_stations = await self.async_load_pollen_station_list()
         stations = pollen_stations
         if (self.hass.config.latitude is not None and
             self.hass.config.longitude is not None):
@@ -192,40 +192,47 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return INVALID_VALUE
         return d
 
-    def load_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
+    async def async_load_station_list(self, encoding: str = 'ISO-8859-1') -> list[WeatherStation]:
         _LOGGER.info("Requesting station list data...")
-        with requests.get(STATION_LIST_URL, stream = True, timeout = REQUEST_TIMEOUT) as r:
-            lines = (line.decode(encoding) for line in r.iter_lines())
-            reader = csv.DictReader(lines, delimiter=';')
-            stations = []
-            for row in reader:
-                _LOGGER.debug(row)
-                code =  row.get("Abbr.")
-                if code is None:
-                    _LOGGER.debug("No code in row.", extra={"Station": row})
-                    continue
-                # Skip stations that have almost no useable data
-                measurements = row.get("Measurements")
-                if measurements is None:
-                    _LOGGER.debug("No measurements in row.", extra={"Station": row})
-                    continue
-                if "Temperature" not in measurements:
-                    _LOGGER.debug("Skipping station due to lack of data.", extra={"Station": row})
-                    continue
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(STATION_LIST_URL, timeout=REQUEST_TIMEOUT) as r:
+                text = await r.text(encoding=encoding)
+                lines = text.splitlines()
+                reader = csv.DictReader(lines, delimiter=';')
+                stations = []
+                for row in reader:
+                    _LOGGER.debug(row)
+                    code =  row.get("Abbr.")
+                    if code is None:
+                        _LOGGER.debug("No code in row.", extra={"Station": row})
+                        continue
+                    # Skip stations that have almost no useable data
+                    measurements = row.get("Measurements")
+                    if measurements is None:
+                        _LOGGER.debug("No measurements in row.", extra={"Station": row})
+                        continue
+                    if "Temperature" not in measurements:
+                        _LOGGER.debug("Skipping station due to lack of data.", extra={"Station": row})
+                        continue
 
-                stations.append(WeatherStation(row.get("Station"),
-                                               row.get("Abbr."),
-                                               _int_or_none(row.get("Station height m a. sea level")),
-                                               _float_or_none(row.get("Latitude")),
-                                               _float_or_none(row.get("Longitude")),
-                                               row.get("Canton")))
-            _LOGGER.info("Retrieved %d stations.", len(stations))
-            return stations
+                    stations.append(WeatherStation(row.get("Station"),
+                                                   row.get("Abbr."),
+                                                   _int_or_none(row.get("Station height m a. sea level")),
+                                                   _float_or_none(row.get("Latitude")),
+                                                   _float_or_none(row.get("Longitude")),
+                                                   row.get("Canton")))
+                _LOGGER.info("Retrieved %d stations.", len(stations))
+                return stations
+        except Exception:
+            _LOGGER.exception("Failed to load station list")
+            return []
 
-    def load_pollen_station_list(self, encoding='ISO-8859-1') -> list[WeatherStation]:
+    async def async_load_pollen_station_list(self) -> list[WeatherStation]:
         _LOGGER.info("Requesting pollen station list data...")
-        pollen_client = PollenClient(self.hass.config.language)
-        pollen_station_list = pollen_client.get_pollen_station_list()
+        session = async_get_clientsession(self.hass)
+        pollen_client = PollenClient(session, self.hass.config.language)
+        pollen_station_list = await pollen_client.async_get_pollen_station_list()
         if pollen_station_list is None:
             return []
         stations = []
