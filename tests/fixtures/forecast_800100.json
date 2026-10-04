@@ -1,0 +1,137 @@
+{
+  "currentWeather": {
+    "time": 1791102000000,
+    "icon": 1,
+    "iconV2": 1,
+    "temperature": 15.7
+  },
+  "forecast": [
+    {
+      "dayDate": "2026-10-04",
+      "iconDay": 2,
+      "iconDayV2": 2,
+      "temperatureMax": 22,
+      "temperatureMin": 13,
+      "precipitation": 0.0,
+      "precipitationMin": 0.0,
+      "precipitationMax": 0.0
+    },
+    {
+      "dayDate": "2026-10-05",
+      "iconDay": 1,
+      "iconDayV2": 1,
+      "temperatureMax": 21,
+      "temperatureMin": 13,
+      "precipitation": 0.0,
+      "precipitationMin": 0.0,
+      "precipitationMax": 1.2
+    },
+    {
+      "dayDate": "2026-10-06",
+      "iconDay": 2,
+      "iconDayV2": 2,
+      "temperatureMax": 21,
+      "temperatureMin": 11,
+      "precipitation": 0.0,
+      "precipitationMin": 0.0,
+      "precipitationMax": 0.1
+    },
+    {
+      "dayDate": "2026-10-07",
+      "iconDay": 3,
+      "iconDayV2": 3,
+      "temperatureMax": 22,
+      "temperatureMin": 11,
+      "precipitation": 0.5,
+      "precipitationMin": 0.0,
+      "precipitationMax": 4.6
+    },
+    {
+      "dayDate": "2026-10-08",
+      "iconDay": 20,
+      "iconDayV2": 20,
+      "temperatureMax": 15,
+      "temperatureMin": 9,
+      "precipitation": 16.2,
+      "precipitationMin": 5.6,
+      "precipitationMax": 26.8
+    },
+    {
+      "dayDate": "2026-10-09",
+      "iconDay": 29,
+      "iconDayV2": 29,
+      "temperatureMax": 13,
+      "temperatureMin": 7,
+      "precipitation": 1.4,
+      "precipitationMin": 0.0,
+      "precipitationMax": 10.8
+    },
+    {
+      "dayDate": "2026-10-10",
+      "iconDay": 5,
+      "iconDayV2": 5,
+      "temperatureMax": 15,
+      "temperatureMin": 7,
+      "precipitation": 1.1,
+      "precipitationMin": 0.0,
+      "precipitationMax": 8.0
+    },
+    {
+      "dayDate": "2026-10-11",
+      "iconDay": 3,
+      "iconDayV2": 3,
+      "temperatureMax": 14,
+      "temperatureMin": 8,
+      "precipitation": 1.5,
+      "precipitationMin": 0.0,
+      "precipitationMax": 9.3
+    }
+  ],
+  "warnings": [
+    {
+      "warnType": 10,
+      "warnLevel": 3,
+      "regionId": 2600,
+      "text": "More information on measures in force in the cantons to be found on the FOEN Website.",
+      "validFrom": 1790935347000,
+      "validTo": 1791108000000,
+      "ordering": "a3m1790935347000",
+      "htmlText": "More information on measures in force in the cantons to be found on the FOEN Website.",
+      "outlook": false,
+      "links": [
+        {
+          "url": "https://www.natural-hazards.ch/home/dealing-with-natural-hazards/forest-fire.html",
+          "text": "General recommendations"
+        },
+        {
+          "url": "https://www.forestfiredanger.ch",
+          "text": "Federal Office for the Environment FOEN"
+        }
+      ]
+    }
+  ],
+  "warningsOverview": [
+    {
+      "warnType": 10,
+      "warnLevel": 3
+    }
+  ],
+  "graph": {
+    "start": 1791064800000,
+    "startLowResolution": 1791118800000,
+    "precipitation10m": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "weatherIcon3h": [101, 101, 1, 1],
+    "windDirection3h": [155, 309, 323, 338],
+    "windSpeed3h": [4.2, 3.6, 3.8, 4.0],
+    "precipitationProbability3h": [0.0, 0.0, 0.0, 0.0],
+    "sunrise": [1791091721348, 1791178204384],
+    "sunset": [1791133176324, 1791219457230],
+    "temperatureMin1h": [17.0, 16.3, 15.5, 15.2, 14.7, 14.3],
+    "temperatureMax1h": [17.0, 16.3, 15.5, 15.2, 15.0, 16.6],
+    "temperatureMean1h": [17.0, 16.3, 15.5, 15.2, 14.7, 14.3],
+    "precipitation1h": [0.0, 0.0, 0.0, 0.0],
+    "windSpeed1h": [4.2, 2.9, 2.7, 3.6, 2.7, 2.7],
+    "gustSpeed1h": [10.4, 6.4, 6.0, 8.0, 7.8, 9.5],
+    "sunshine1h": [0, 0, 0, 0, 0, 0]
+  }
+}
