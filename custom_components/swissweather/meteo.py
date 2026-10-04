@@ -213,7 +213,9 @@ class MeteoClient:
             return None
         weather = []
         for row in data:
-            weather.append(self._get_current_data_for_row(row))
+            item = self._get_current_data_for_row(row)
+            if item is not None:
+                weather.append(item)
         return weather
 
     async def async_get_current_weather_for_station(self, station: str) -> CurrentWeather | None:
@@ -225,11 +227,15 @@ class MeteoClient:
 
         return self._get_current_data_for_row(data)
 
-    def _get_current_data_for_row(self, csv_row) -> CurrentWeather:
-        timestamp = None
+    def _get_current_data_for_row(self, csv_row) -> CurrentWeather | None:
         timestamp_raw = csv_row.get('Date', None)
-        if timestamp_raw is not None:
+        if not timestamp_raw:
+            return None
+        try:
             timestamp = datetime.strptime(timestamp_raw, '%Y%m%d%H%M').replace(tzinfo=UTC)
+        except (ValueError, TypeError):
+            logger.warning("Failed to parse date %s from row", timestamp_raw)
+            return None
 
         return CurrentWeather(
             csv_row.get('Station/Location'),
@@ -263,13 +269,23 @@ class MeteoClient:
 
         sunrises = None
         sunriseJson = forecastJson.get("graph", {}).get("sunrise", None)
-        if sunriseJson is not None:
-            sunrises = [datetime.fromtimestamp(epoch / 1000, UTC) for epoch in sunriseJson]
+        if sunriseJson is not None and isinstance(sunriseJson, list):
+            sunrises = []
+            for epoch in sunriseJson:
+                try:
+                    sunrises.append(datetime.fromtimestamp(epoch / 1000, UTC))
+                except (ValueError, TypeError, OSError):
+                    pass
 
         sunsets = None
         sunsetJson = forecastJson.get("graph", {}).get("sunset", None)
-        if sunsetJson is not None:
-            sunsets = [datetime.fromtimestamp(epoch / 1000, UTC) for epoch in sunsetJson]
+        if sunsetJson is not None and isinstance(sunsetJson, list):
+            sunsets = []
+            for epoch in sunsetJson:
+                try:
+                    sunsets.append(datetime.fromtimestamp(epoch / 1000, UTC))
+                except (ValueError, TypeError, OSError):
+                    pass
 
         return WeatherForecast(currentState, dailyForecast, hourlyForecast, sunrises, sunsets, warnings)
 
@@ -304,13 +320,17 @@ class MeteoClient:
 
     def _get_daily_forecast(self, forecastJson) -> list[Forecast] | None:
         forecast: list[Forecast] = []
-        if "forecast" not in forecastJson:
+        if "forecast" not in forecastJson or not isinstance(forecastJson["forecast"], list):
             return forecast
 
         for dailyJson in forecastJson["forecast"]:
-            timestamp = None
-            if "dayDate" in dailyJson:
+            if not isinstance(dailyJson, dict) or "dayDate" not in dailyJson:
+                continue
+            try:
                 timestamp = datetime.strptime(dailyJson["dayDate"], '%Y-%m-%d')
+            except (ValueError, TypeError):
+                logger.warning("Failed to parse dayDate: %s", dailyJson.get("dayDate"))
+                continue
             icon = to_int(dailyJson.get('iconDay', None))
             condition = ICON_TO_CONDITION_MAP.get(icon)
             temperatureMax = (to_float(dailyJson.get('temperatureMax', None)), "°C")
@@ -321,35 +341,39 @@ class MeteoClient:
 
     def _get_hourly_forecast(self, forecastJson) -> list[Forecast] | None:
         graphJson = forecastJson.get("graph", None)
-        if graphJson is None:
+        if graphJson is None or not isinstance(graphJson, dict):
             return None
 
         startTimestampEpoch = to_int(graphJson.get('start', None))
         if startTimestampEpoch is None:
             return None
-        startTimestamp = datetime.fromtimestamp(startTimestampEpoch / 1000, UTC)
+        try:
+            startTimestamp = datetime.fromtimestamp(startTimestampEpoch / 1000, UTC)
+        except (ValueError, TypeError, OSError):
+            return None
 
         forecast = []
-        temperatureMaxList = [ (value, "°C") for value in graphJson.get("temperatureMax1h", [])]
-        temperatureMeanList = [ (value, "°C") for value in graphJson.get("temperatureMean1h", [])]
-        temperatureMinList = [ (value, "°C") for value in graphJson.get("temperatureMin1h", [])]
-        windGustSpeedList = [ (value, "km/h") for value in graphJson.get("gustSpeed1h", [])]
-        windSpeedList = [ (value, "km/h") for value in graphJson.get("windSpeed1h", [])]
-        sunshineList = [ (value, "min/h") for value in graphJson.get("sunshine1h", [])]
+        temperatureMaxList = [ (value, "°C") for value in (graphJson.get("temperatureMax1h") or [])]
+        temperatureMeanList = [ (value, "°C") for value in (graphJson.get("temperatureMean1h") or [])]
+        temperatureMinList = [ (value, "°C") for value in (graphJson.get("temperatureMin1h") or [])]
+        windGustSpeedList = [ (value, "km/h") for value in (graphJson.get("gustSpeed1h") or [])]
+        windSpeedList = [ (value, "km/h") for value in (graphJson.get("windSpeed1h") or [])]
+        sunshineList = [ (value, "min/h") for value in (graphJson.get("sunshine1h") or [])]
 
         precipitationList = []
-        if graphJson.get("precipitation1h") is not None and graphJson.get("precipitation10m") is not None:
+        precipitation10mList = graphJson.get("precipitation10m")
+        precipitation1hList = graphJson.get("precipitation1h")
+        if precipitation1hList and precipitation10mList:
             # Precipitation behaves a bit differently - the 1h values are offset after the 10m values(start vs. startLowResolution) so the
             # 10min values need to be averaged to 1h and prepended to get the correct timestamp.
-            precipitation10mList = graphJson.get("precipitation10m", [])
-            precipitation1hList = graphJson.get("precipitation1h", [])
+            precip10m = list(precipitation10mList)
             # We usually have one less value in the 10m list, so append the "next" value to get a full chunk for averaging.
-            precipitation10mList.append(precipitation1hList[0])
+            precip10m.append(precipitation1hList[0])
             # Average 10m values in chunks of 6 to get hourly data.
-            precipitationList = [sum(precipitation10mList[i:i+6]) / 6.0 for i in range(0, len(precipitation10mList), 6)]
+            precipitationList = [sum(precip10m[i:i+6]) / 6.0 for i in range(0, len(precip10m), 6)]
             # Drop the values to make the list the same size as other hourlies.
             lenDiff = len(temperatureMeanList) - len(precipitation1hList)
-            logger.debug("Need to leave %d 10min datapoints out of %d (%d pre merge)", lenDiff, len(precipitationList), len(precipitation10mList))
+            logger.debug("Need to leave %d 10min datapoints out of %d (%d pre merge)", lenDiff, len(precipitationList), len(precip10m))
             del precipitationList[lenDiff:]
             logger.debug("List: %s", str(precipitationList))
             # Now append hourly data
@@ -359,9 +383,13 @@ class MeteoClient:
             logger.debug("Calculated precipitation - %d 10-mins, %d hourlies into %d total", len(precipitation10mList), len(precipitation1hList), len(precipitationList))
 
         # We get icons only once every 3 hours so we need to expand each elemen 3-times to match
-        iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in graphJson.get("weatherIcon3h", [])))
-        windDirectionlist = list(itertools.chain.from_iterable(itertools.repeat((x, "°"), 3) for x in graphJson.get("windDirection3h", [])))
-        precipitationProbabilityList = list(itertools.chain.from_iterable(itertools.repeat((x, "%"), 3) for x in graphJson.get("precipitationProbability3h", [])))
+        weatherIcon3h = graphJson.get("weatherIcon3h") or []
+        windDirection3h = graphJson.get("windDirection3h") or []
+        precipitationProbability3h = graphJson.get("precipitationProbability3h") or []
+
+        iconList = list(itertools.chain.from_iterable(itertools.repeat(x, 3) for x in weatherIcon3h))
+        windDirectionlist = list(itertools.chain.from_iterable(itertools.repeat((x, "°"), 3) for x in windDirection3h))
+        precipitationProbabilityList = list(itertools.chain.from_iterable(itertools.repeat((x, "%"), 3) for x in precipitationProbability3h))
 
         # This is the minimum amount of data we have
         minForecastHours = min(len(temperatureMaxList), len(temperatureMeanList), len(temperatureMinList), len(precipitationList), len(iconList))
@@ -375,11 +403,13 @@ class MeteoClient:
 
     def _get_weather_warnings(self, forecastJson) -> list[Warning]:
         warningsJson = forecastJson.get("warnings", None)
-        if warningsJson is None:
+        if warningsJson is None or not isinstance(warningsJson, list):
             return []
 
         warnings = []
         for warningJson in warningsJson:
+            if not isinstance(warningJson, dict):
+                continue
             try:
                 warningType = to_int(warningJson.get("warnType"))
                 warningLevel = to_int(warningJson.get("warnLevel"))
@@ -391,14 +421,27 @@ class MeteoClient:
                 validFromEpoch = to_int(warningJson.get("validFrom"))
                 validToEpoch = to_int(warningJson.get("validTo"))
                 if validFromEpoch is not None:
-                    validFrom = datetime.fromtimestamp(validFromEpoch / 1000, UTC)
+                    try:
+                        validFrom = datetime.fromtimestamp(validFromEpoch / 1000, UTC)
+                    except (ValueError, TypeError, OSError):
+                        pass
                 if validToEpoch is not None:
-                    validTo = datetime.fromtimestamp(validToEpoch / 1000, UTC)
+                    try:
+                        validTo = datetime.fromtimestamp(validToEpoch / 1000, UTC)
+                    except (ValueError, TypeError, OSError):
+                        pass
 
                 try:
                     type = WarningType(warningType)
                 except ValueError:
                     type = WarningType.UNKNOWN
+
+                links = warningJson.get("links") or []
+                links_parsed = [
+                    (link.get("text"), link.get("url"))
+                    for link in links
+                    if isinstance(link, dict)
+                ]
 
                 warning = Warning(
                     type,
@@ -408,7 +451,7 @@ class MeteoClient:
                     bool(warningJson.get("outlook")),
                     validFrom,
                     validTo,
-                    [(link.get("text"), link.get("url")) for link in warningJson.get("links")])
+                    links_parsed)
                 warnings.append(warning)
             except Exception:
                 logger.error("Failed to parse warning", exc_info=True)
@@ -421,12 +464,15 @@ class MeteoClient:
         if rows is None:
             return None
         return next((row for row in rows
-            if row['Station/Location'].casefold() == station.casefold()), None)
+            if isinstance(row, dict) and row.get('Station/Location', '').casefold() == station.casefold()), None)
 
     async def _async_get_csv_rows_for_url(self, url: str, encoding: str = 'utf-8') -> list[dict[str, str]] | None:
         try:
             logger.debug("Requesting station data from %s...", url)
             async with self.session.get(url, timeout=REQUEST_TIMEOUT) as r:
+                if r.status != 200:
+                    logger.warning("Failed to fetch CSV from %s: HTTP %s", url, r.status)
+                    return None
                 text = await r.text(encoding=encoding)
                 return list(csv.DictReader(text.splitlines(), delimiter=';'))
         except (aiohttp.ClientError, TimeoutError):
@@ -442,7 +488,10 @@ class MeteoClient:
                     "Accept-Language": language,
                     "Accept": "application/json" },
                 timeout = REQUEST_TIMEOUT) as r:
+                if r.status != 200:
+                    logger.warning("Failed to fetch forecast from %s: HTTP %s", url, r.status)
+                    return None
                 return await r.json()
-        except (aiohttp.ClientError, TimeoutError):
-            logger.error("Connection failure.", exc_info=1)
+        except (aiohttp.ClientError, TimeoutError, ValueError):
+            logger.error("Connection failure or invalid JSON.", exc_info=1)
             return None

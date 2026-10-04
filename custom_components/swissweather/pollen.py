@@ -100,8 +100,14 @@ class PollenClient:
             return None
         stations = []
         for row in station_list:
-            stations.append(StationInfo(row.get('station_name'),
-                                  row.get('station_abbr'),
+            if not isinstance(row, dict):
+                continue
+            name = row.get('station_name')
+            abbr = row.get('station_abbr')
+            if not name or not abbr:
+                continue
+            stations.append(StationInfo(name,
+                                  abbr,
                                   row.get(f'station_type_{self.language}'),
                                   to_float(row.get('station_height_masl')),
                                   to_float(row.get('station_coordinates_wgs84_lat')),
@@ -154,33 +160,45 @@ class PollenClient:
                     logger.warning("Failed to load %s: HTTP %s", url, response.status)
                     return (None, None)
                 pollenJson = await response.json()
+                if not isinstance(pollenJson, dict):
+                    return (None, None)
                 stations = pollenJson.get("stations")
-                if stations is None:
+                if not isinstance(stations, list):
                     return (None, None)
                 for station in stations:
-                    if station.get("id") is None or station.get("id").lower() != stationAbbrev.lower():
+                    if not isinstance(station, dict):
+                        continue
+                    station_id = station.get("id")
+                    if not station_id or not isinstance(station_id, str) or station_id.lower() != stationAbbrev.lower():
                         continue
                     current = station.get("current")
-                    if current is None:
+                    if not isinstance(current, dict):
                         logger.warning("No current data for %s in dataset for %s!", stationAbbrev, pollenKey)
                         continue
                     timestamp_val = current.get("date")
-                    if timestamp_val is not None:
-                        timestamp = datetime.fromtimestamp(timestamp_val / 1000, UTC)
-                    else:
-                        timestamp = None
+                    if timestamp_val is None:
+                        logger.warning("No timestamp for %s in dataset for %s!", stationAbbrev, pollenKey)
+                        continue
+                    try:
+                        timestamp = datetime.fromtimestamp(float(timestamp_val) / 1000, UTC)
+                    except (ValueError, TypeError, OSError):
+                        logger.warning("Failed to parse date %s for %s!", timestamp_val, stationAbbrev)
+                        continue
                     value = to_float(current.get("value"))
                     return (value, timestamp)
                 logger.warning("Couldn't find %s in dataset for %s!", stationAbbrev, pollenKey)
                 return (None, None)
-        except (aiohttp.ClientError, TimeoutError) as _:
-            logger.error("Connection failure.", exc_info=True)
+        except (aiohttp.ClientError, TimeoutError, ValueError) as _:
+            logger.error("Connection failure or malformed JSON.", exc_info=True)
             return (None, None)
 
     async def _async_get_csv_rows_for_url(self, url: str, encoding: str = 'utf-8') -> list[dict[str, str]] | None:
         try:
             logger.debug("Requesting station data from %s...", url)
             async with self.session.get(url, timeout=REQUEST_TIMEOUT) as r:
+                if r.status != 200:
+                    logger.warning("Failed to load %s: HTTP %s", url, r.status)
+                    return None
                 text = await r.text(encoding=encoding)
                 return list(csv.DictReader(text.splitlines(), delimiter=';'))
         except (aiohttp.ClientError, TimeoutError):
