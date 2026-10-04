@@ -77,7 +77,7 @@ def to_float(string: str) -> float | None:
     try:
         return float(string)
     except ValueError:
-        logger.error("Failed to convert value %s", string, exc_info=True)
+        logger.exception("Failed to convert value %s", string)
         return None
 
 def to_int(string: str) -> int | None:
@@ -91,7 +91,7 @@ def to_int(string: str) -> int | None:
     try:
         return int(string)
     except ValueError:
-        logger.error("Failed to convert value %s", string, exc_info=True)
+        logger.exception("Failed to convert value %s", string)
         return None
 
 FloatValue = NewType('FloatValue', tuple[float | None, str | None])
@@ -327,7 +327,7 @@ class MeteoClient:
             if not isinstance(dailyJson, dict) or "dayDate" not in dailyJson:
                 continue
             try:
-                timestamp = datetime.strptime(dailyJson["dayDate"], '%Y-%m-%d')
+                timestamp = datetime.strptime(dailyJson["dayDate"], '%Y-%m-%d').replace(tzinfo=UTC)
             except (ValueError, TypeError):
                 logger.warning("Failed to parse dayDate: %s", dailyJson.get("dayDate"))
                 continue
@@ -393,7 +393,7 @@ class MeteoClient:
 
         # This is the minimum amount of data we have
         minForecastHours = min(len(temperatureMaxList), len(temperatureMeanList), len(temperatureMinList), len(precipitationList), len(iconList))
-        timestampList = [ startTimestamp + timedelta(hours=value) for value in range(0, minForecastHours) ]
+        timestampList = [ startTimestamp + timedelta(hours=value) for value in range(minForecastHours) ]
 
         for ts, icon, tMax, tMean, tMin, precipitation, precipitationProbability, windDirection, windSpeed, windGustSpeed, sunshine in zip(timestampList, iconList, temperatureMaxList,
                                                         temperatureMeanList, temperatureMinList, precipitationList, precipitationProbabilityList, windDirectionlist, windSpeedList, windGustSpeedList, sunshineList, strict=False):
@@ -454,7 +454,7 @@ class MeteoClient:
                     links_parsed)
                 warnings.append(warning)
             except Exception:
-                logger.error("Failed to parse warning", exc_info=True)
+                logger.exception("Failed to parse warning")
         return warnings
 
     async def _async_get_current_weather_line_for_station(self, station: str) -> dict[str, str] | None:
@@ -476,7 +476,7 @@ class MeteoClient:
                 text = await r.text(encoding=encoding)
                 return list(csv.DictReader(text.splitlines(), delimiter=';'))
         except (aiohttp.ClientError, TimeoutError):
-            logger.error("Connection failure.", exc_info=True)
+            logger.exception("Connection failure.")
             return None
 
     async def _async_get_forecast_json(self, postCode: int | str, language: str) -> dict[str, Any] | None:
@@ -493,5 +493,5 @@ class MeteoClient:
                     return None
                 return await r.json()
         except (aiohttp.ClientError, TimeoutError, ValueError):
-            logger.error("Connection failure or invalid JSON.", exc_info=1)
+            logger.exception("Connection failure or invalid JSON.")
             return None

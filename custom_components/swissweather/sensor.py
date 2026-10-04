@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from propcache.api import cached_property
 
@@ -127,7 +127,7 @@ async def async_setup_entry(
         entities += [SwissPollenLevelSensor(postCode, pollenStationCode, deviceInfo, sensorEntry, pollenCoordinator) for sensorEntry in POLLEN_SENSORS if sensorEntry.device_class is None]
 
     entities.append(SwissWeatherWarningsSensor(postCode, deviceInfo, coordinator))
-    for i in range(0, numberOfWeatherWarnings):
+    for i in range(numberOfWeatherWarnings):
         entities.append(SwissWeatherSingleWarningSensor(postCode, i, deviceInfo, coordinator))
         entities.append(SwissWeatherSingleWarningLevelSensor(postCode, i, deviceInfo, coordinator))
     async_add_entities(entities)

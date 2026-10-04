@@ -188,8 +188,8 @@ class PollenClient:
                     return (value, timestamp)
                 logger.warning("Couldn't find %s in dataset for %s!", stationAbbrev, pollenKey)
                 return (None, None)
-        except (aiohttp.ClientError, TimeoutError, ValueError) as _:
-            logger.error("Connection failure or malformed JSON.", exc_info=True)
+        except (aiohttp.ClientError, TimeoutError, ValueError):
+            logger.exception("Connection failure or malformed JSON.")
             return (None, None)
 
     async def _async_get_csv_rows_for_url(self, url: str, encoding: str = 'utf-8') -> list[dict[str, str]] | None:
@@ -202,5 +202,5 @@ class PollenClient:
                 text = await r.text(encoding=encoding)
                 return list(csv.DictReader(text.splitlines(), delimiter=';'))
         except (aiohttp.ClientError, TimeoutError):
-            logger.error("Connection failure.", exc_info=True)
+            logger.exception("Connection failure.")
             return None

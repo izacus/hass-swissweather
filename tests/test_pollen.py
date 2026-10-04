@@ -14,7 +14,6 @@ if str(WORKSPACE_ROOT) not in sys.path:
 import aiohttp
 
 from custom_components.swissweather.pollen import (
-    CurrentPollen,
     PollenClient,
 )
 
@@ -37,12 +36,16 @@ def make_mock_aiohttp_response(text: str = "", json_data: dict | None = None, st
 class TestPollenClient(unittest.IsolatedAsyncioTestCase):
     """Test PollenClient methods with real station fixtures (including PZH)."""
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.stations_csv = (FIXTURES_DIR / "pollen_stations.csv").read_text(encoding="utf-8")
+        with open(FIXTURES_DIR / "pollen_data.json", encoding="utf-8") as f:
+            cls.pollen_data = json.load(f)
+
     async def asyncSetUp(self):
         self.mock_session = MagicMock(spec=aiohttp.ClientSession)
         self.client = PollenClient(session=self.mock_session, language="en")
-        self.stations_csv = (FIXTURES_DIR / "pollen_stations.csv").read_text(encoding="utf-8")
-        with open(FIXTURES_DIR / "pollen_data.json", encoding="utf-8") as f:
-            self.pollen_data = json.load(f)
 
     async def test_get_pollen_station_list_pzh(self):
         """Test parsing pollen stations list including station PZH."""

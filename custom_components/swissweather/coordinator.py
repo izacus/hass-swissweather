@@ -38,8 +38,8 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
             try:
                 current_state = await self._client.async_get_current_weather_for_station(self._station_code)
                 _LOGGER.debug("Current state: %s", current_state)
-            except Exception as e:
-                _LOGGER.exception(e)
+            except Exception:
+                _LOGGER.exception("Failed to update current weather state")
                 current_state = None
 
         try:
@@ -56,7 +56,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
                 # Remove all warnings that have expired and sort them via severity.
                 current_forecast.warnings = self._sort_filter_weather_alerts(current_forecast.warnings)
         except Exception as e:
-            _LOGGER.exception(e)
+            _LOGGER.exception("Failed to update weather forecast")
             raise UpdateFailed(f"Update failed: {e}") from e
         return (current_state, current_forecast)
 
@@ -93,6 +93,6 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
                 current_state = await self._client.async_get_current_pollen_for_station(self._pollen_station_code)
                 _LOGGER.debug("Current pollen: %s", current_state)
             except Exception as e:
-                _LOGGER.exception(e)
+                _LOGGER.exception("Failed to update pollen data")
                 raise UpdateFailed(f"Update failed: {e}") from e
         return current_state

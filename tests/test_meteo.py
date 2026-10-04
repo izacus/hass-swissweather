@@ -14,16 +14,10 @@ if str(WORKSPACE_ROOT) not in sys.path:
 import aiohttp
 
 from custom_components.swissweather.meteo import (
-    CONDITION_CLASSES,
-    ICON_TO_CONDITION_MAP,
     MISSING_VALUE_SENTINEL,
     MeteoClient,
-    StationInfo,
     WarningLevel,
     WarningType,
-    to_float,
-    to_int,
-    to_meteoswiss_language,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -45,12 +39,16 @@ def make_mock_aiohttp_response(text: str = "", json_data: dict | None = None, st
 class TestMeteoClient(unittest.IsolatedAsyncioTestCase):
     """Test MeteoClient methods with real live station fixtures (including SMA)."""
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.vqha80_content = (FIXTURES_DIR / "vqha80_sample.csv").read_text(encoding="utf-8")
+        with open(FIXTURES_DIR / "forecast_800100.json", encoding="utf-8") as f:
+            cls.forecast_json = json.load(f)
+
     async def asyncSetUp(self):
         self.mock_session = MagicMock(spec=aiohttp.ClientSession)
         self.client = MeteoClient(session=self.mock_session, language="en")
-        self.vqha80_content = (FIXTURES_DIR / "vqha80_sample.csv").read_text(encoding="utf-8")
-        with open(FIXTURES_DIR / "forecast_800100.json", encoding="utf-8") as f:
-            self.forecast_json = json.load(f)
 
     async def test_get_current_weather_for_station_sma(self):
         """Test parsing live SMA station data from VQHA80 CSV."""
@@ -132,7 +130,7 @@ class TestMeteoClient(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(daily)
         self.assertEqual(len(daily), 8)
         first_day = daily[0]
-        self.assertEqual(first_day.timestamp, datetime(2026, 10, 4))
+        self.assertEqual(first_day.timestamp, datetime(2026, 10, 4, tzinfo=UTC))
         self.assertEqual(first_day.icon, 2)
         self.assertEqual(first_day.condition, "partlycloudy")
         self.assertEqual(first_day.temperatureMax, (22.0, "°C"))
@@ -331,7 +329,7 @@ class TestMeteoClient(unittest.IsolatedAsyncioTestCase):
         daily = self.client._get_daily_forecast(data)
         self.assertIsNotNone(daily)
         self.assertEqual(len(daily), 1)
-        self.assertEqual(daily[0].timestamp, datetime(2026, 10, 4))
+        self.assertEqual(daily[0].timestamp, datetime(2026, 10, 4, tzinfo=UTC))
         self.assertEqual(daily[0].icon, 1)
 
     def test_hourly_forecast_corrupted_start_timestamp(self):
