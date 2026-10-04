@@ -30,8 +30,16 @@ jobs:
         run: |
           uv pip install -r requirements_test.txt
 
-      - name: Run tests
+      - name: Run tests with coverage
         env:
           PYTHONPATH: .
         run: |
-          pytest tests
+          pytest --cov=custom_components/swissweather --cov-report=term tests
+
+      - name: Publish coverage summary
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f .coverage ]; then
+            echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+          fi
