@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 import logging
 
-import requests
+import aiohttp
 
 from .meteo import (
     DEFAULT_LANGUAGE,
@@ -80,8 +80,8 @@ def to_float(string: str) -> float | None:
 class PollenClient:
     """Returns values for pollen."""
 
+    session: aiohttp.ClientSession
     language: str = DEFAULT_LANGUAGE
-    _session: requests.Session
 
     """
     Initializes the client.
@@ -89,20 +89,25 @@ class PollenClient:
     Languages available are en, de, fr and it. Any other tag (including full
     Home Assistant tags such as "de-CH") is normalized to one of those.
     """
-    def __init__(self, language=DEFAULT_LANGUAGE):
+    def __init__(self, session: aiohttp.ClientSession, language: str | None = DEFAULT_LANGUAGE) -> None:
+        self.session = session
         self.language = to_meteoswiss_language(language)
-        self._session = requests.Session()
-        self._session.headers.update({"User-Agent": FORECAST_USER_AGENT})
 
-    def get_pollen_station_list(self) -> list[StationInfo] | None:
-        station_list = self._get_csv_dictionary_for_url(POLLEN_STATIONS_URL, encoding='latin-1')
+    async def async_get_pollen_station_list(self) -> list[StationInfo] | None:
+        station_list = await self._async_get_csv_rows_for_url(POLLEN_STATIONS_URL, encoding='latin-1')
         logger.debug("Loading %s", POLLEN_STATIONS_URL)
         if station_list is None:
             return None
         stations = []
         for row in station_list:
-            stations.append(StationInfo(row.get('station_name'),
-                                  row.get('station_abbr'),
+            if not isinstance(row, dict):
+                continue
+            name = row.get('station_name')
+            abbr = row.get('station_abbr')
+            if not name or not abbr:
+                continue
+            stations.append(StationInfo(name,
+                                  abbr,
                                   row.get(f'station_type_{self.language}'),
                                   to_float(row.get('station_height_masl')),
                                   to_float(row.get('station_coordinates_wgs84_lat')),
@@ -114,13 +119,13 @@ class PollenClient:
         logger.info("Found %d stations for pollen.", len(stations))
         return stations
 
-    def get_current_pollen_for_station(self, stationAbbrev: str) -> CurrentPollen | None:
+    async def async_get_current_pollen_for_station(self, stationAbbrev: str) -> CurrentPollen | None:
         timestamp = None
         unit = "p/m³"
         types = ["birke", "graeser", "erle", "hasel", "buche", "esche", "eiche"]
         values = []
         for t in types:
-            value, ts = self.get_current_pollen_for_station_type(stationAbbrev, t)
+            value, ts = await self.async_get_current_pollen_for_station_type(stationAbbrev, t)
             if timestamp is None and ts is not None:
                 timestamp = ts
             values.append(value)
@@ -139,47 +144,63 @@ class PollenClient:
             (values[6], unit)
         )
 
-    def get_current_pollen_for_station_type(self, stationAbbrev: str, pollenKey: str) -> (float|None, datetime|None):
+    async def async_get_current_pollen_for_station_type(self, stationAbbrev: str, pollenKey: str) -> tuple[float|None, datetime|None]:
         url = POLLEN_DATA_URL.format(key=pollenKey, language=self.language)
         logger.debug("Loading %s", url)
         try:
-            response = self._session.get(
+            async with self.session.get(
                 url,
-                headers={"Accept": "application/json"},
+                headers={
+                    "User-Agent": FORECAST_USER_AGENT,
+                    "Accept": "application/json"
+                },
                 timeout=REQUEST_TIMEOUT,
-            )
-            response.raise_for_status()
-            pollenJson = response.json()
-            stations = pollenJson.get("stations")
-            if stations is None:
+            ) as response:
+                if response.status != 200:
+                    logger.warning("Failed to load %s: HTTP %s", url, response.status)
+                    return (None, None)
+                pollenJson = await response.json()
+                if not isinstance(pollenJson, dict):
+                    return (None, None)
+                stations = pollenJson.get("stations")
+                if not isinstance(stations, list):
+                    return (None, None)
+                for station in stations:
+                    if not isinstance(station, dict):
+                        continue
+                    station_id = station.get("id")
+                    if not station_id or not isinstance(station_id, str) or station_id.lower() != stationAbbrev.lower():
+                        continue
+                    current = station.get("current")
+                    if not isinstance(current, dict):
+                        logger.warning("No current data for %s in dataset for %s!", stationAbbrev, pollenKey)
+                        continue
+                    timestamp_val = current.get("date")
+                    if timestamp_val is None:
+                        logger.warning("No timestamp for %s in dataset for %s!", stationAbbrev, pollenKey)
+                        continue
+                    try:
+                        timestamp = datetime.fromtimestamp(float(timestamp_val) / 1000, UTC)
+                    except (ValueError, TypeError, OSError):
+                        logger.warning("Failed to parse date %s for %s!", timestamp_val, stationAbbrev)
+                        continue
+                    value = to_float(current.get("value"))
+                    return (value, timestamp)
+                logger.warning("Couldn't find %s in dataset for %s!", stationAbbrev, pollenKey)
                 return (None, None)
-            for station in stations:
-                if station.get("id") is None or station.get("id").lower() != stationAbbrev.lower():
-                    continue
-                current = station.get("current")
-                if current is None:
-                    logger.warning("No current data for %s in dataset for %s!", stationAbbrev, pollenKey)
-                    continue
-                timestamp_val = current.get("date")
-                if timestamp_val is not None:
-                    timestamp = datetime.fromtimestamp(timestamp_val / 1000, UTC)
-                else:
-                    timestamp = None
-                value = to_float(current.get("value"))
-                return (value, timestamp)
-            logger.warning("Couldn't find %s in dataset for %s!", stationAbbrev, pollenKey)
-            return (None, None)
-        except requests.exceptions.RequestException as _:
-            logger.error("Connection failure.", exc_info=True)
+        except (aiohttp.ClientError, TimeoutError, ValueError):
+            logger.exception("Connection failure or malformed JSON.")
             return (None, None)
 
-    def _get_csv_dictionary_for_url(self, url, encoding='utf-8'):
+    async def _async_get_csv_rows_for_url(self, url: str, encoding: str = 'utf-8') -> list[dict[str, str]] | None:
         try:
             logger.debug("Requesting station data from %s...", url)
-            with self._session.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
-                r.raise_for_status()
-                lines = (line.decode(encoding) for line in r.iter_lines())
-                yield from csv.DictReader(lines, delimiter=';')
-        except requests.exceptions.RequestException:
-            logger.error("Connection failure.", exc_info=True)
+            async with self.session.get(url, timeout=REQUEST_TIMEOUT) as r:
+                if r.status != 200:
+                    logger.warning("Failed to load %s: HTTP %s", url, r.status)
+                    return None
+                text = await r.text(encoding=encoding)
+                return list(csv.DictReader(text.splitlines(), delimiter=';'))
+        except (aiohttp.ClientError, TimeoutError):
+            logger.exception("Connection failure.")
             return None

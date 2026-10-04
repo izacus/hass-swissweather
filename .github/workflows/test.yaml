@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv and Python 3.14
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+          activate-environment: "true"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv pip install -r requirements_test.txt
+
+      - name: Run tests with coverage
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest --cov=custom_components/swissweather --cov-report=term tests
+
+      - name: Publish coverage summary
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f .coverage ]; then
+            echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,4 @@
+homeassistant
+pytest
+pytest-cov
+aiohttp

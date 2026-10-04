@@ -1,0 +1,5 @@
+station_name;station_abbr;station_type_de;station_type_fr;station_type_it;station_type_en;station_height_masl;station_coordinates_wgs84_lat;station_coordinates_wgs84_lon;station_canton
+Zürich-Flughafen;PZH;automatisch;automatique;automatico;automated;436;47.45;8.56;ZH
+Basel;BAS;automatisch;automatique;automatico;automated;273;47.56;7.58;BS
+Lugano;LUG;automatisch;automatique;automatico;automated;273;46.00;8.96;TI
+

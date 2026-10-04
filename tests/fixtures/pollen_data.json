@@ -1,0 +1,102 @@
+{
+  "birke": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "12.5"
+        }
+      },
+      {
+        "id": "BAS",
+        "station_name": "Basel",
+        "canton": "BS",
+        "current": {
+          "date": 1791100800000,
+          "value": "3.0"
+        }
+      }
+    ]
+  },
+  "graeser": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "45.0"
+        }
+      }
+    ]
+  },
+  "erle": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "0.0"
+        }
+      }
+    ]
+  },
+  "hasel": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "5.0"
+        }
+      }
+    ]
+  },
+  "buche": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "60.0"
+        }
+      }
+    ]
+  },
+  "esche": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "150.0"
+        }
+      }
+    ]
+  },
+  "eiche": {
+    "stations": [
+      {
+        "id": "PZH",
+        "station_name": "Zürich-Flughafen",
+        "canton": "ZH",
+        "current": {
+          "date": 1791100800000,
+          "value": "450.0"
+        }
+      }
+    ]
+  }
+}

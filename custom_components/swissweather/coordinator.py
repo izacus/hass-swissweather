@@ -6,6 +6,7 @@ from datetime import UTC, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
@@ -22,7 +23,8 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
         self._post_code = config_entry.data[CONF_POST_CODE]
-        self._client = MeteoClient(hass.config.language)
+        session = async_get_clientsession(hass)
+        self._client = MeteoClient(session, hass.config.language)
         update_interval = timedelta(minutes=10)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
                          always_update=False)
@@ -34,16 +36,15 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
         else:
             _LOGGER.info("Loading current weather state for %s", self._station_code)
             try:
-                current_state = await self.hass.async_add_executor_job(
-                    self._client.get_current_weather_for_station, self._station_code)
+                current_state = await self._client.async_get_current_weather_for_station(self._station_code)
                 _LOGGER.debug("Current state: %s", current_state)
-            except Exception as e:
-                _LOGGER.exception(e)
+            except Exception:
+                _LOGGER.exception("Failed to update current weather state")
                 current_state = None
 
         try:
             _LOGGER.info("Loading current forecast for %s", self._post_code)
-            current_forecast = await self.hass.async_add_executor_job(self._client.get_forecast, self._post_code)
+            current_forecast = await self._client.async_get_forecast(self._post_code)
             _LOGGER.debug("Current forecast: %s", current_forecast)
             if current_state is None:
                 current = None
@@ -55,7 +56,7 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
                 # Remove all warnings that have expired and sort them via severity.
                 current_forecast.warnings = self._sort_filter_weather_alerts(current_forecast.warnings)
         except Exception as e:
-            _LOGGER.exception(e)
+            _LOGGER.exception("Failed to update weather forecast")
             raise UpdateFailed(f"Update failed: {e}") from e
         return (current_state, current_forecast)
 
@@ -76,7 +77,8 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._pollen_station_code = config_entry.data.get(CONF_POLLEN_STATION_CODE)
-        self._client = PollenClient(hass.config.language)
+        session = async_get_clientsession(hass)
+        self._client = PollenClient(session, hass.config.language)
         update_interval = timedelta(minutes=60)
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval,
             always_update=False)
@@ -88,10 +90,9 @@ class SwissPollenDataCoordinator(DataUpdateCoordinator[CurrentPollen | None]):
         else:
             _LOGGER.info("Loading current pollen state for %s", self._pollen_station_code)
             try:
-                current_state = await self.hass.async_add_executor_job(
-                    self._client.get_current_pollen_for_station, self._pollen_station_code)
+                current_state = await self._client.async_get_current_pollen_for_station(self._pollen_station_code)
                 _LOGGER.debug("Current pollen: %s", current_state)
             except Exception as e:
-                _LOGGER.exception(e)
+                _LOGGER.exception("Failed to update pollen data")
                 raise UpdateFailed(f"Update failed: {e}") from e
         return current_state
