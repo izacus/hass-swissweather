@@ -95,6 +95,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # If the API broke, we still give user the option to manually enter the
                 # station code and continue.
                 return self.async_show_form(
+                    step_id="user",
                     data_schema=STEP_USER_DATA_SCHEMA_BACKUP
                 )
 
