@@ -118,6 +118,12 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         return None
 
     @property
+    def native_wind_gust_speed(self) -> float | None:
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.gustPeak1s)
+        return None
+
+    @property
     def native_wind_speed_unit(self) -> str | None:
         return UnitOfSpeed.KILOMETERS_PER_HOUR
 
@@ -125,6 +131,12 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     def humidity(self) -> float | None:
         if self._current_state is not None:
             return self.value_or_none(self._current_state.relativeHumidity)
+        return None
+
+    @property
+    def native_dew_point(self) -> float | None:
+        if self._current_state is not None:
+            return self.value_or_none(self._current_state.dewPoint)
         return None
 
     @property
