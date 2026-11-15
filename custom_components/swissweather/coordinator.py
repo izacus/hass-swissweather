@@ -9,7 +9,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_POLLEN_STATION_CODE, CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
+from .const import (
+    CONF_GROUP_STATION_CODES,
+    CONF_POLLEN_STATION_CODE,
+    CONF_POST_CODE,
+    CONF_STATION_CODE,
+    DOMAIN,
+)
 from .meteo import CurrentWeather, MeteoClient, Warning, WeatherForecast
 from .pollen import CurrentPollen, PollenClient
 
@@ -22,6 +28,9 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         self._station_code = config_entry.data.get(CONF_STATION_CODE)
+        self._group_station_codes = {group: config_entry.data[key]
+                                     for group, key in CONF_GROUP_STATION_CODES.items()
+                                     if config_entry.data.get(key)}
         self._post_code = config_entry.data[CONF_POST_CODE]
         session = async_get_clientsession(hass)
         self._client = MeteoClient(session, hass.config.language)
@@ -36,7 +45,8 @@ class SwissWeatherDataCoordinator(DataUpdateCoordinator[tuple[CurrentWeather | N
         else:
             _LOGGER.info("Loading current weather state for %s", self._station_code)
             try:
-                current_state = await self._client.async_get_current_weather_for_station(self._station_code)
+                current_state = await self._client.async_get_current_weather_for_stations(
+                    self._station_code, self._group_station_codes)
                 _LOGGER.debug("Current state: %s", current_state)
             except Exception:
                 _LOGGER.exception("Failed to update current weather state")

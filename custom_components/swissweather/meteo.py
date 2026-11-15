@@ -20,6 +20,14 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=20, sock_connect=10)
 # Languages MeteoSwiss publishes its data in.
 SUPPORTED_LANGUAGES = ("de", "fr", "it", "en")
 DEFAULT_LANGUAGE = "en"
+# Fields of CurrentWeather that can be taken from a different station, grouped by measurement.
+STATION_GROUP_FIELDS = {
+    "temperature": ("airTemperature", "relativeHumidity", "dewPoint"),
+    "precipitation": ("precipitation",),
+    "wind": ("windDirection", "windSpeed", "gustPeak1s"),
+    "pressure": ("pressureStationLevel", "pressureSeaLevel", "pressureSeaLevelAtStandardAtmosphere"),
+    "sunshine": ("sunshine", "globalRadiation"),
+}
 
 """
 Maps a Home Assistant language tag onto a language MeteoSwiss supports.
@@ -226,6 +234,37 @@ class MeteoClient:
             return None
 
         return self._get_current_data_for_row(data)
+
+    """
+    Returns current weather of the main station, with measurement groups taken from other stations.
+
+    group_stations maps a key of STATION_GROUP_FIELDS to a station code. Values the
+    group station doesn't report are kept from the main station.
+    """
+    async def async_get_current_weather_for_stations(self, station: str, group_stations: dict[str, str]) -> CurrentWeather | None:
+        logger.debug("Retrieving current weather for %s with group stations %s", station, group_stations)
+        rows = await self._async_get_csv_rows_for_url(CURRENT_CONDITION_URL)
+        if rows is None:
+            return None
+        main_row = self._find_row_for_station(rows, station)
+        if main_row is None:
+            logger.warning("Couldn't find data for station %s", station)
+            return None
+        weather = self._get_current_data_for_row(main_row)
+        if weather is None:
+            return None
+
+        for group, group_station in group_stations.items():
+            group_row = self._find_row_for_station(rows, group_station)
+            group_weather = self._get_current_data_for_row(group_row) if group_row is not None else None
+            if group_weather is None:
+                logger.warning("Couldn't find data for %s station %s", group, group_station)
+                continue
+            for field in STATION_GROUP_FIELDS[group]:
+                value = getattr(group_weather, field)
+                if value is not None and value[0] is not None:
+                    setattr(weather, field, value)
+        return weather
 
     def _get_current_data_for_row(self, csv_row) -> CurrentWeather | None:
         timestamp_raw = csv_row.get('Date', None)
@@ -463,6 +502,9 @@ class MeteoClient:
         rows = await self._async_get_csv_rows_for_url(CURRENT_CONDITION_URL)
         if rows is None:
             return None
+        return self._find_row_for_station(rows, station)
+
+    def _find_row_for_station(self, rows: list[dict[str, str]], station: str) -> dict[str, str] | None:
         return next((row for row in rows
             if isinstance(row, dict) and row.get('Station/Location', '').casefold() == station.casefold()), None)
 

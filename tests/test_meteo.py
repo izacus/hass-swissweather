@@ -111,6 +111,38 @@ class TestMeteoClient(unittest.IsolatedAsyncioTestCase):
         self.assertIn("JUN", station_codes)
         self.assertIn("SMA", station_codes)
 
+    async def test_get_current_weather_for_stations_merges_groups(self):
+        """Test groups are taken from their own station and the rest from the main one."""
+        self.mock_session.get.return_value = make_mock_aiohttp_response(text=self.vqha80_content)
+
+        weather = await self.client.async_get_current_weather_for_stations(
+            "SMA", {"wind": "JUN", "pressure": "TAE"})
+        self.assertIsNotNone(weather)
+        self.assertEqual(weather.station, "SMA")
+        self.assertEqual(weather.airTemperature, (16.0, "°C"))
+        self.assertEqual(weather.windSpeed, (8.3, "km/h"))
+        self.assertEqual(weather.gustPeak1s, (11.2, "km/h"))
+        self.assertEqual(weather.windDirection, (310.0, "°"))
+        self.assertEqual(weather.pressureSeaLevel, (1028.5, "hPa"))
+        self.assertEqual(self.mock_session.get.call_count, 1)
+
+    async def test_get_current_weather_for_stations_falls_back_to_main(self):
+        """Test missing group values and unknown group stations keep the main station's values."""
+        self.mock_session.get.return_value = make_mock_aiohttp_response(text=self.vqha80_content)
+
+        weather = await self.client.async_get_current_weather_for_stations(
+            "SMA", {"precipitation": "JUN", "temperature": "NONEXISTENT"})
+        self.assertIsNotNone(weather)
+        self.assertEqual(weather.precipitation, (0.0, "mm"))
+        self.assertEqual(weather.airTemperature, (16.0, "°C"))
+
+    async def test_get_current_weather_for_stations_unknown_main(self):
+        """Test an unknown main station returns None even if group stations exist."""
+        self.mock_session.get.return_value = make_mock_aiohttp_response(text=self.vqha80_content)
+
+        self.assertIsNone(await self.client.async_get_current_weather_for_stations(
+            "NONEXISTENT", {"wind": "JUN"}))
+
     async def test_get_forecast_full(self):
         """Test parsing complete forecast data for postal code 8001 (Zurich)."""
         self.mock_session.get.return_value = make_mock_aiohttp_response(json_data=self.forecast_json)
