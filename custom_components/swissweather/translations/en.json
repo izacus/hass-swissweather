@@ -6,7 +6,9 @@
         "error": {
             "cannot_connect": "Failed to connect",
             "invalid_auth": "Invalid authentication",
-            "unknown": "Unexpected error"
+            "unknown": "Unexpected error",
+            "unknown_group_station": "Unknown station {station}.",
+            "no_group_values": "Station {station} currently reports no values for {group}. If the station is only temporarily down, try again later."
         },
         "step": {
             "user": {
@@ -15,6 +17,21 @@
                     "postCode": "Post number for forecast data",
                     "pollenStationCode": "Pollen measuring station",
                     "weatherWarningsNumber": "Number of weather warnings to show as separate entities (default: 1)"
+                }
+            },
+            "reconfigure": {
+                "sections": {
+                    "groupStations": {
+                        "name": "Measurements from other stations",
+                        "description": "Optionally take a group of measurements from a different station. Empty fields use the weather station above.",
+                        "data": {
+                            "temperatureStationCode": "Temperature, humidity and dew point",
+                            "precipitationStationCode": "Precipitation",
+                            "windStationCode": "Wind",
+                            "pressureStationCode": "Pressure",
+                            "sunshineStationCode": "Sunshine and global radiation"
+                        }
+                    }
                 }
             }
         }
