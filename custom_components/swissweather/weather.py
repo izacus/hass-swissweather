@@ -12,7 +12,7 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -63,6 +63,22 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
         self._postCode = postCode
         self._attr_attribution = "Source: MeteoSwiss"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Write the new state and push the new forecast to subscribers.
+
+        Forecasts are not part of the entity state: frontend cards get them
+        through forecast subscriptions, which only receive new data when
+        async_update_listeners is called.
+        """
+        super()._handle_coordinator_update()
+        if entry := self.coordinator.config_entry:
+            entry.async_create_task(self.hass, self.async_update_listeners(None))
+            return
+        self.hass.async_create_task(
+            self.async_update_listeners(None), f"{self.coordinator.name}"
+        )
 
     @property
     def _current_state(self) -> CurrentWeather | None:

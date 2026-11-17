@@ -29,3 +29,37 @@ class TestSwissWeatherEntity(unittest.TestCase):
         entity = SwissWeather(coordinator, "8001", "SMA")
         self.assertIsNone(entity.native_wind_gust_speed)
         self.assertIsNone(entity.native_dew_point)
+
+    def test_coordinator_update_pushes_forecast_to_subscribers(self):
+        """Test that a coordinator update also pushes the forecast to subscribers."""
+        coordinator = MagicMock(data=None)
+        entity = SwissWeather(coordinator, "8001", "SMA")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        update_listeners = object()
+        entity.async_update_listeners = MagicMock(return_value=update_listeners)
+
+        entity._handle_coordinator_update()
+
+        entity.async_write_ha_state.assert_called_once_with()
+        entity.async_update_listeners.assert_called_once_with(None)
+        coordinator.config_entry.async_create_task.assert_called_once_with(
+            entity.hass, update_listeners
+        )
+
+    def test_coordinator_update_without_config_entry_pushes_forecast(self):
+        """Test the forecast push falls back to hass when there is no config entry."""
+        coordinator = MagicMock(data=None, config_entry=None)
+        coordinator.name = "swissweather"
+        entity = SwissWeather(coordinator, "8001", "SMA")
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        update_listeners = object()
+        entity.async_update_listeners = MagicMock(return_value=update_listeners)
+
+        entity._handle_coordinator_update()
+
+        entity.async_update_listeners.assert_called_once_with(None)
+        entity.hass.async_create_task.assert_called_once_with(
+            update_listeners, "swissweather"
+        )
