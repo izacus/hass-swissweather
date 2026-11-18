@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 
-from homeassistant.components.weather import Forecast, WeatherEntity
+from homeassistant.components.weather import Forecast, SingleCoordinatorWeatherEntity
 from homeassistant.components.weather.const import WeatherEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -16,7 +16,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SwissWeatherDataCoordinator, get_weather_coordinator_key
 from .const import CONF_POST_CODE, CONF_STATION_CODE, DOMAIN
@@ -41,7 +40,7 @@ async def async_setup_entry(
         ]
     )
 
-class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity):
+class SwissWeather(SingleCoordinatorWeatherEntity[SwissWeatherDataCoordinator]):
 
     @staticmethod
     def value_or_none(value: FloatValue | None) -> float | None:
@@ -63,22 +62,6 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
         self._attr_device_info = DeviceInfo(entry_type=DeviceEntryType.SERVICE, name=f"MeteoSwiss at {id_combo}", identifiers={(DOMAIN, f"swissweather-{id_combo}")})
         self._postCode = postCode
         self._attr_attribution = "Source: MeteoSwiss"
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Write the new state and push the new forecast to subscribers.
-
-        Forecasts are not part of the entity state: frontend cards get them
-        through forecast subscriptions, which only receive new data when
-        async_update_listeners is called.
-        """
-        super()._handle_coordinator_update()
-        if entry := self.coordinator.config_entry:
-            entry.async_create_task(self.hass, self.async_update_listeners(None))
-            return
-        self.hass.async_create_task(
-            self.async_update_listeners(None), f"{self.coordinator.name}"
-        )
 
     @property
     def _current_state(self) -> CurrentWeather | None:
@@ -175,7 +158,8 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
     def supported_features(self) -> int | None:
         return WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
 
-    async def async_forecast_daily(self) -> list[Forecast] | None:
+    @callback
+    def _async_forecast_daily(self) -> list[Forecast] | None:
         _LOGGER.debug("Retrieving daily forecast.")
         if self._current_forecast is None:
             _LOGGER.info("No daily forecast available.")
@@ -185,7 +169,8 @@ class SwissWeather(CoordinatorEntity[SwissWeatherDataCoordinator], WeatherEntity
             return None
         return [self.meteo_forecast_to_forecast(entry, False) for entry in forecast_data]
 
-    async def async_forecast_hourly(self) -> list[Forecast] | None:
+    @callback
+    def _async_forecast_hourly(self) -> list[Forecast] | None:
         _LOGGER.debug("Retrieving hourly forecast.")
         if self._current_forecast is None or self._current_forecast.hourlyForecast is None:
             _LOGGER.info("No hourly forecast available.")

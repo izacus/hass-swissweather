@@ -1,4 +1,5 @@
 """Tests for the SwissWeather weather entity."""
+import datetime
 from pathlib import Path
 import sys
 import unittest
@@ -30,36 +31,38 @@ class TestSwissWeatherEntity(unittest.TestCase):
         self.assertIsNone(entity.native_wind_gust_speed)
         self.assertIsNone(entity.native_dew_point)
 
-    def test_coordinator_update_pushes_forecast_to_subscribers(self):
-        """Test that a coordinator update also pushes the forecast to subscribers."""
-        coordinator = MagicMock(data=None)
-        entity = SwissWeather(coordinator, "8001", "SMA")
-        entity.hass = MagicMock()
-        entity.async_write_ha_state = MagicMock()
-        update_listeners = object()
-        entity.async_update_listeners = MagicMock(return_value=update_listeners)
 
-        entity._handle_coordinator_update()
+class TestSwissWeatherForecast(unittest.IsolatedAsyncioTestCase):
+    """Test the forecasts exposed by the weather entity."""
 
-        entity.async_write_ha_state.assert_called_once_with()
-        entity.async_update_listeners.assert_called_once_with(None)
-        coordinator.config_entry.async_create_task.assert_called_once_with(
-            entity.hass, update_listeners
-        )
+    def setUp(self):
+        self.timestamp = datetime.datetime.now(tz=datetime.UTC).replace(
+            minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
+        hourly = MagicMock(timestamp=self.timestamp, condition="sunny",
+                           temperatureMean=(17.0, "°C"))
+        daily = MagicMock(timestamp=self.timestamp, condition="rainy",
+                          temperatureMax=(20.0, "°C"), temperatureMin=(9.0, "°C"))
+        forecast = MagicMock(hourlyForecast=[hourly], dailyForecast=[daily])
+        self.entity = SwissWeather(MagicMock(data=(None, forecast)), "8001", "SMA")
 
-    def test_coordinator_update_without_config_entry_pushes_forecast(self):
-        """Test the forecast push falls back to hass when there is no config entry."""
-        coordinator = MagicMock(data=None, config_entry=None)
-        coordinator.name = "swissweather"
-        entity = SwissWeather(coordinator, "8001", "SMA")
-        entity.hass = MagicMock()
-        entity.async_write_ha_state = MagicMock()
-        update_listeners = object()
-        entity.async_update_listeners = MagicMock(return_value=update_listeners)
+    async def test_hourly_forecast(self):
+        """Test the hourly forecast."""
+        forecast = await self.entity.async_forecast_hourly()
+        self.assertEqual(len(forecast), 1)
+        self.assertEqual(forecast[0]["datetime"], self.timestamp.isoformat())
+        self.assertEqual(forecast[0]["condition"], "sunny")
+        self.assertEqual(forecast[0]["temperature"], 17.0)
 
-        entity._handle_coordinator_update()
+    async def test_daily_forecast(self):
+        """Test the daily forecast."""
+        forecast = await self.entity.async_forecast_daily()
+        self.assertEqual(len(forecast), 1)
+        self.assertEqual(forecast[0]["condition"], "rainy")
+        self.assertEqual(forecast[0]["temperature"], 20.0)
+        self.assertEqual(forecast[0]["templow"], 9.0)
 
-        entity.async_update_listeners.assert_called_once_with(None)
-        entity.hass.async_create_task.assert_called_once_with(
-            update_listeners, "swissweather"
-        )
+    async def test_no_forecast(self):
+        """Test that forecasts are None without data."""
+        entity = SwissWeather(MagicMock(data=None), "8001", "SMA")
+        self.assertIsNone(await entity.async_forecast_hourly())
+        self.assertIsNone(await entity.async_forecast_daily())
