@@ -16,6 +16,7 @@ from custom_components.swissweather.config_flow import (
     get_reporting_stations,
     merge_reconfigure_input,
     validate_group_stations,
+    validate_main_station,
 )
 from custom_components.swissweather.meteo import MeteoClient
 from tests.test_meteo import FIXTURES_DIR, make_mock_aiohttp_response
@@ -112,7 +113,7 @@ class TestGroupStationsAgainstCurrentData(unittest.IsolatedAsyncioTestCase):
     def test_unknown_station_is_rejected(self):
         """Test typed text that is neither a station code nor a name is rejected."""
         self.assertEqual(validate_group_stations({"windStationCode": "Kloten"}, self.STATIONS, self.current_weather),
-                         ({"base": "unknown_group_station"}, {"station": "Kloten"}))
+                         ({"base": "unknown_station"}, {"station": "Kloten"}))
 
     def test_station_without_values_is_rejected(self):
         """Test a typed station without values for the group is rejected."""
@@ -123,6 +124,37 @@ class TestGroupStationsAgainstCurrentData(unittest.IsolatedAsyncioTestCase):
         """Test group stations can't be checked without current data."""
         self.assertEqual(validate_group_stations({"windStationCode": "SMA"}, self.STATIONS, None),
                          ({"base": "cannot_connect"}, {}))
+
+
+class TestMainStation(unittest.TestCase):
+    """Test how the main station from the searchable picker is stored."""
+
+    STATIONS = TestGroupStationsAgainstCurrentData.STATIONS + [
+        WeatherStation("Zürich / Kloten", "KLO", 426, 47.48, 8.54, "ZH", ["Wind", "Pressure"]),
+    ]
+
+    def test_name_or_code_is_saved_as_code(self):
+        """Test a picked name or a typed code is stored as station code."""
+        for value in ("Zürich / Fluntern", " sma "):
+            data = {"postCode": "8001", "stationCode": value}
+            self.assertEqual(validate_main_station(data, self.STATIONS), ({}, {}))
+            self.assertEqual(data, {"postCode": "8001", "stationCode": "SMA"})
+
+    def test_no_main_station(self):
+        """Test entries without a main station are accepted."""
+        self.assertEqual(validate_main_station({"postCode": "8001"}, self.STATIONS), ({}, {}))
+
+    def test_unknown_station_is_rejected(self):
+        """Test typed text that is not a station offered in the picker is rejected (KLO has no temperature)."""
+        for value in ("Fluntern", "KLO"):
+            self.assertEqual(validate_main_station({"stationCode": value}, self.STATIONS),
+                             ({"base": "unknown_station"}, {"station": value}))
+
+    def test_missing_station_list(self):
+        """Test a typed code is kept when the station list can't be loaded."""
+        data = {"stationCode": "SMA"}
+        self.assertEqual(validate_main_station(data, []), ({}, {}))
+        self.assertEqual(data, {"stationCode": "SMA"})
 
 
 class TestReconfigureForm(unittest.IsolatedAsyncioTestCase):
@@ -144,3 +176,33 @@ class TestReconfigureForm(unittest.IsolatedAsyncioTestCase):
             result = await flow.async_step_reconfigure()
         user_input = {"stationCode": "SMA", "weatherWarningsNumber": 1, GROUP_STATIONS_SECTION: {}}
         self.assertEqual(result["data_schema"](user_input), {**user_input, "weatherWarningsNumber": 1.0})
+
+
+class TestUserStep(unittest.IsolatedAsyncioTestCase):
+    """Test the main station in the initial step."""
+
+    async def asyncSetUp(self):
+        session = MagicMock()
+        session.get.side_effect = lambda url, **kwargs: make_mock_aiohttp_response(text=STATION_LIST)
+        self.flow = ConfigFlow()
+        self.flow.hass = MagicMock()
+        self.flow.hass.config.latitude = None
+        self.flow.hass.config.longitude = None
+        self.flow._get_pollen_station_options = AsyncMock(return_value=[])
+        self.flow._async_abort_entries_match = MagicMock()
+        self.flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        patcher = patch("custom_components.swissweather.config_flow.async_get_clientsession", return_value=session)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    async def test_picked_name_is_saved_as_code(self):
+        """Test the entry is created with the code of the picked station."""
+        await self.flow.async_step_user({"postCode": "8001", "stationCode": "Zürich / Fluntern", "weatherWarningsNumber": 1})
+        self.assertEqual(self.flow.async_create_entry.call_args.kwargs["data"]["stationCode"], "SMA")
+
+    async def test_unknown_station_shows_error(self):
+        """Test the form is shown again for an unknown station."""
+        result = await self.flow.async_step_user({"postCode": "8001", "stationCode": "Fluntern", "weatherWarningsNumber": 1})
+        self.flow.async_create_entry.assert_not_called()
+        self.assertEqual(result["errors"], {"base": "unknown_station"})
+        self.assertEqual(result["description_placeholders"], {"station": "Fluntern"})

@@ -77,10 +77,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
-        if user_input is None:
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
+        if user_input is not None:
+            errors, placeholders = validate_main_station(user_input, await self.async_load_station_list())
+        if user_input is None or errors:
             try:
                 stations = await self.async_load_station_list()
-                station_options = self._get_weather_station_options(stations, "Temperature")
+                station_options = self._get_weather_station_options(stations, "Temperature", use_names=True)
                 pollen_station_options = await self._get_pollen_station_options()
 
                 # Setup defaults if we're reconfiguring
@@ -89,7 +93,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_STATION_CODE): SelectSelector(
                         SelectSelectorConfig(
                             options=station_options,
-                            mode=SelectSelectorMode.DROPDOWN
+                            mode=SelectSelectorMode.DROPDOWN,
+                            # Renders a searchable picker, see the group stations in the reconfigure step.
+                            custom_value=True,
                         ),
                     ),
                     vol.Optional(CONF_POLLEN_STATION_CODE): SelectSelector(
@@ -103,7 +109,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 })
                 return self.async_show_form(
-                    step_id="user", data_schema=schema
+                    step_id="user", data_schema=self.add_suggested_values_to_schema(schema, user_input),
+                    errors=errors, description_placeholders=placeholders
                 )
             except Exception:
                 _LOGGER.exception("Failed to retrieve station list, back to manual mode!")
@@ -136,11 +143,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_mismatch()
             reconfigure_entry = self._get_reconfigure_entry()
             data = merge_reconfigure_input(reconfigure_entry.data, user_input)
-            errors, placeholders = validate_group_stations(data, stations, current_weather)
+            errors, placeholders = validate_main_station(data, stations)
+            if not errors:
+                errors, placeholders = validate_group_stations(data, stations, current_weather)
             if not errors:
                 return self.async_update_reload_and_abort(reconfigure_entry, data=data)
 
-        station_options = self._get_weather_station_options(stations, "Temperature")
+        station_options = self._get_weather_station_options(stations, "Temperature", use_names=True)
         pollen_station_options = await self._get_pollen_station_options()
 
         reconfigure_entry = self._get_reconfigure_entry()
@@ -160,10 +169,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         names_by_code = {station.code: station.name for station in stations}
         schema = vol.Schema({
             # suggested_value instead of default: a default of None fails validation when nothing is chosen.
-            vol.Optional(CONF_STATION_CODE, description={"suggested_value": default_station_code}): SelectSelector(
+            vol.Optional(CONF_STATION_CODE, description={"suggested_value": names_by_code.get(default_station_code, default_station_code)}): SelectSelector(
                 SelectSelectorConfig(
                     options=station_options,
-                    mode=SelectSelectorMode.DROPDOWN
+                    mode=SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
                 ),
             ),
             vol.Optional(CONF_POLLEN_STATION_CODE, description={"suggested_value": default_pollen_station_code}): SelectSelector(
@@ -301,6 +311,18 @@ def get_reporting_stations(stations: list[WeatherStation], current_weather: list
                  if any(getattr(current, name)[0] is not None for name in STATION_GROUP_FIELDS[group])}
     return [station for station in stations if station.code in reporting]
 
+def validate_main_station(data: dict[str, Any], stations: list[WeatherStation]) -> tuple[dict[str, str], dict[str, str]]:
+    """Replace the chosen main station by its code."""
+    value = data.get(CONF_STATION_CODE)
+    # Without the station list, a typed code is kept as it is.
+    if not value or not stations:
+        return {}, {}
+    code = find_station_code([station for station in stations if "Temperature" in station.measurements], value)
+    if code is None:
+        return {"base": "unknown_station"}, {"station": value}
+    data[CONF_STATION_CODE] = code
+    return {}, {}
+
 def validate_group_stations(data: dict[str, Any], stations: list[WeatherStation],
                             current_weather: list[CurrentWeather] | None) -> tuple[dict[str, str], dict[str, str]]:
     """Replace chosen group stations by their codes and check they currently report values for their group."""
@@ -312,7 +334,7 @@ def validate_group_stations(data: dict[str, Any], stations: list[WeatherStation]
     for key in selected.values():
         code = find_station_code(stations, data[key])
         if code is None:
-            return {"base": "unknown_group_station"}, {"station": data[key]}
+            return {"base": "unknown_station"}, {"station": data[key]}
         data[key] = code
     for group, key in selected.items():
         if not any(station.code == data[key] for station in get_reporting_stations(stations, current_weather, group)):
