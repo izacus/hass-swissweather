@@ -14,12 +14,26 @@
             "user": {
                 "data": {
                     "stationCode": "Weather station for current weather state",
-                    "postCode": "Post number for forecast data",
+                    "postCode": "Postal code for forecast data",
                     "pollenStationCode": "Pollen measuring station",
                     "weatherWarningsNumber": "Number of weather warnings to show as separate entities (default: 1)"
+                },
+                "data_description": {
+                    "stationCode": "Optional. Measuring station for current values like wind and precipitation. Without one, only the forecast temperature is shown.",
+                    "postCode": "Swiss postal code, e.g. 8001.",
+                    "pollenStationCode": "Optional. Station for current pollen counts."
                 }
             },
             "reconfigure": {
+                "data": {
+                    "stationCode": "Weather station for current weather state",
+                    "pollenStationCode": "Pollen measuring station",
+                    "weatherWarningsNumber": "Number of weather warnings to show as separate entities (default: 1)"
+                },
+                "data_description": {
+                    "stationCode": "Optional. Measuring station for current values like wind and precipitation. Without one, only the forecast temperature is shown.",
+                    "pollenStationCode": "Optional. Station for current pollen counts."
+                },
                 "sections": {
                     "groupStations": {
                         "name": "Measurements from other stations",
